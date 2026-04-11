@@ -16,38 +16,13 @@ const PAYMENT_METHODS = [
 
 export default function StudentCart() {
   const navigate = useNavigate()
-  const { items, total, count, updateQty, removeItem, clearCart, syncing } = useCart()
+  const { items, total, count, updateQty, removeItem, clearCart, syncing } =
+    useCart()
   const { addNotification } = useNotifications()
+
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
-
-  const tryCheckout = async () => {
-    const attempts = [
-      () => cartService.checkout({ paymentMethod }),
-      () => cartService.checkout(paymentMethod),
-      () => cartService.checkout({ method: paymentMethod }),
-      () => cartService.checkout(),
-    ]
-
-    let lastError = null
-
-    for (const attempt of attempts) {
-      try {
-        const result = await attempt()
-        return result
-      } catch (error) {
-        lastError = error
-
-        const status = error?.response?.status
-        if (status !== 400) {
-          throw error
-        }
-      }
-    }
-
-    throw lastError || new Error('Checkout failed.')
-  }
 
   const handlePlaceOrder = async () => {
     if (items.length === 0) {
@@ -58,9 +33,19 @@ export default function StudentCart() {
     setPlacing(true)
 
     try {
-      const order = await tryCheckout()
+      const backendCart = await cartService.getCart()
 
-      resetCart()
+      if (!backendCart?.items?.length) {
+        toast.error(
+          'Your backend cart is empty. Please add the items again from the menu.',
+        )
+        return
+      }
+
+      const order = await cartService.checkout({ paymentMethod })
+
+      await clearCart()
+
       setPlaced({
         ...order,
         paymentMethod,
@@ -69,7 +54,9 @@ export default function StudentCart() {
       addNotification({
         type: 'order',
         title: 'Order Placed! 🎉',
-        message: `${order?.orderNumber || `#${order?.id}` || 'Your order'} is being prepared.`,
+        message: `${
+          order?.orderNumber || `#${order?.id}` || 'Your order'
+        } is being prepared.`,
         icon: '🍽',
       })
 
@@ -83,10 +70,21 @@ export default function StudentCart() {
         error?.response?.data?.error ||
         error?.message
 
-      if (status === 400) {
+      const message = String(backendMessage || '').toLowerCase()
+
+      if (
+        error?.code === 'CART_EMPTY' ||
+        message.includes('cart not found') ||
+        message.includes('cart is empty') ||
+        message.includes('empty cart')
+      ) {
+        toast.error(
+          'Cart not found on server. Please add items again from the menu.',
+        )
+      } else if (status === 400) {
         toast.error(backendMessage || 'Checkout request is invalid.')
       } else {
-        toast.error('Failed to place order. Please try again.')
+        toast.error(backendMessage || 'Failed to place order. Please try again.')
       }
     } finally {
       setPlacing(false)
@@ -95,7 +93,11 @@ export default function StudentCart() {
 
   if (placed) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-lg mx-auto">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="max-w-lg mx-auto"
+      >
         <div className="glass-card p-8 text-center space-y-5">
           <motion.div
             initial={{ scale: 0 }}
@@ -107,9 +109,12 @@ export default function StudentCart() {
           </motion.div>
 
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Order Placed!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Order Placed!
+            </h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-              {placed.orderNumber || `Order #${placed.id}`} has been sent to the kitchen.
+              {placed.orderNumber || `Order #${placed.id}`} has been sent to the
+              kitchen.
             </p>
           </div>
 
@@ -137,11 +142,15 @@ export default function StudentCart() {
 
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Status</span>
-              <span className="badge badge-yellow">{placed.statusLabel || placed.status}</span>
+              <span className="badge badge-yellow">
+                {placed.statusLabel || placed.status}
+              </span>
             </div>
 
             {placed.shortDescription && (
-              <p className="text-xs text-gray-400 italic">{placed.shortDescription}</p>
+              <p className="text-xs text-gray-400 italic">
+                {placed.shortDescription}
+              </p>
             )}
           </div>
 
@@ -153,7 +162,10 @@ export default function StudentCart() {
             >
               Browse Menu
             </Button>
-            <Button className="flex-1" onClick={() => navigate('/student/orders')}>
+            <Button
+              className="flex-1"
+              onClick={() => navigate('/student/orders')}
+            >
               Track Order
             </Button>
           </div>
@@ -175,7 +187,9 @@ export default function StudentCart() {
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
           Your cart is empty
         </h3>
-        <p className="text-gray-400 text-sm mb-8">Add some delicious items from the menu!</p>
+        <p className="text-gray-400 text-sm mb-8">
+          Add some delicious items from the menu!
+        </p>
         <Button icon="🍽" onClick={() => navigate('/student/menu')}>
           Browse Menu
         </Button>
@@ -220,7 +234,9 @@ export default function StudentCart() {
                 <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                   {item.name}
                 </p>
-                <p className="text-xs text-gray-400">{formatCurrency(item.price)} each</p>
+                <p className="text-xs text-gray-400">
+                  {formatCurrency(item.price)} each
+                </p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
@@ -263,27 +279,37 @@ export default function StudentCart() {
       </div>
 
       <div className="glass-card p-5 space-y-5">
-        <h3 className="font-semibold text-gray-900 dark:text-white">Order Summary</h3>
+        <h3 className="font-semibold text-gray-900 dark:text-white">
+          Order Summary
+        </h3>
 
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-            <span>Subtotal ({count} item{count !== 1 ? 's' : ''})</span>
+            <span>
+              Subtotal ({count} item{count !== 1 ? 's' : ''})
+            </span>
             <span>{formatCurrency(total)}</span>
           </div>
 
           <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
             <span>Delivery</span>
-            <span className="text-green-600 dark:text-green-400 font-medium">Free</span>
+            <span className="text-green-600 dark:text-green-400 font-medium">
+              Free
+            </span>
           </div>
 
           <div className="border-t border-gray-100 dark:border-gray-800 pt-3 flex justify-between font-bold text-base text-gray-900 dark:text-white">
             <span>Total</span>
-            <span className="text-brand-600 dark:text-brand-400">{formatCurrency(total)}</span>
+            <span className="text-brand-600 dark:text-brand-400">
+              {formatCurrency(total)}
+            </span>
           </div>
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">Payment Method</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            Payment Method
+          </p>
 
           <div className="grid grid-cols-3 gap-3">
             {PAYMENT_METHODS.map((method) => {
