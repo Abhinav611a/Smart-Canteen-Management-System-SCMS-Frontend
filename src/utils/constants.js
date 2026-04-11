@@ -125,9 +125,30 @@ export const MENU_CATEGORY_EMOJIS = {
 
 export const DEFAULT_PAGE_SIZE = 10
 
+function getStoragePrefix() {
+  const host = window.location.hostname || ''
+
+  if (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.local')
+  ) {
+    return 'canteen_local'
+  }
+
+  if (host.includes('ngrok')) {
+    return 'canteen_ngrok'
+  }
+
+  return `canteen_${window.location.origin.replace(/[^a-zA-Z0-9]/g, '_')}`
+}
+
+const STORAGE_PREFIX = getStoragePrefix()
+
 export const LS_KEYS = {
-  JWT: 'canteen_jwt',
-  USER: 'canteen_user',
+  JWT: `${STORAGE_PREFIX}_jwt`,
+  USER: `${STORAGE_PREFIX}_user`,
+  REFRESH_TOKEN: `${STORAGE_PREFIX}_refresh_token`,
   THEME: 'canteen_theme',
   CART: 'canteen_cart',
 }

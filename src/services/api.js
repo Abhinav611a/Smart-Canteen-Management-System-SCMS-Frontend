@@ -6,30 +6,16 @@ let networkErrLastShown = 0
 const NETWORK_ERR_DEBOUNCE_MS = 5000
 
 function getStoredJwt() {
-  const directJwt = localStorage.getItem(LS_KEYS.JWT)
-  if (directJwt) return directJwt
-
-  const fallbackKey = Object.keys(localStorage).find((key) =>
-    key.endsWith('_jwt'),
-  )
-
-  return fallbackKey ? localStorage.getItem(fallbackKey) : null
+  return localStorage.getItem(LS_KEYS.JWT)
 }
 
-function clearStoredJwt() {
+function clearStoredAuthStorage() {
   localStorage.removeItem(LS_KEYS.JWT)
+  localStorage.removeItem(LS_KEYS.USER)
 
-  Object.keys(localStorage)
-    .filter((key) => key.endsWith('_jwt'))
-    .forEach((key) => localStorage.removeItem(key))
-
-  Object.keys(localStorage)
-    .filter((key) => key.endsWith('_user'))
-    .forEach((key) => localStorage.removeItem(key))
-
-  Object.keys(localStorage)
-    .filter((key) => key.endsWith('_refresh_token'))
-    .forEach((key) => localStorage.removeItem(key))
+  if (LS_KEYS.REFRESH_TOKEN) {
+    localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+  }
 }
 
 export const apiClient = axios.create({
@@ -41,7 +27,6 @@ export const apiClient = axios.create({
   },
 })
 
-// Attach JWT automatically, but skip public auth endpoints
 apiClient.interceptors.request.use(
   (config) => {
     const token = getStoredJwt()
@@ -57,6 +42,7 @@ apiClient.interceptors.request.use(
       url.includes('/users/refresh')
 
     if (token && !isPublicAuthEndpoint) {
+      config.headers = config.headers || {}
       config.headers.Authorization = `Bearer ${token}`
     } else if (config.headers?.Authorization) {
       delete config.headers.Authorization
@@ -67,7 +53,6 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// Handle responses globally
 apiClient.interceptors.response.use(
   (response) => {
     const body = response.data
@@ -112,7 +97,7 @@ apiClient.interceptors.response.use(
     switch (true) {
       case status === 401:
         if (!isPublicAuthEndpoint) {
-          clearStoredJwt()
+          clearStoredAuthStorage()
           delete apiClient.defaults.headers.common.Authorization
 
           if (!onAuthPage) {

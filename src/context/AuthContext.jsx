@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/auth'
 import { apiClient } from '@/services/api'
 import { websocketService } from '@/services/websocketService'
+import { LS_KEYS } from '@/utils/constants'
 
 const AuthContext = createContext(null)
 
@@ -81,42 +82,16 @@ function normalizeUser(user = {}) {
   }
 }
 
-function getStoragePrefix() {
-  const host = window.location.hostname || ''
-
-  if (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host.endsWith('.local')
-  ) {
-    return 'canteen_local'
-  }
-
-  if (host.includes('ngrok')) {
-    return 'canteen_ngrok'
-  }
-
-  return `canteen_${window.location.origin.replace(/[^a-zA-Z0-9]/g, '_')}`
-}
-
-const STORAGE_PREFIX = getStoragePrefix()
-
-const STORAGE_KEYS = {
-  jwt: `${STORAGE_PREFIX}_jwt`,
-  user: `${STORAGE_PREFIX}_user`,
-  refreshToken: `${STORAGE_PREFIX}_refresh_token`,
-}
-
 function persistAuth(token, user, refreshToken = null) {
   const normalizedUser = normalizeUser(user)
 
-  localStorage.setItem(STORAGE_KEYS.jwt, token)
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(normalizedUser))
+  localStorage.setItem(LS_KEYS.JWT, token)
+  localStorage.setItem(LS_KEYS.USER, JSON.stringify(normalizedUser))
 
   if (refreshToken) {
-    localStorage.setItem(STORAGE_KEYS.refreshToken, refreshToken)
+    localStorage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
   } else {
-    localStorage.removeItem(STORAGE_KEYS.refreshToken)
+    localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
   }
 
   apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
@@ -125,9 +100,9 @@ function persistAuth(token, user, refreshToken = null) {
 }
 
 function clearStoredAuth() {
-  localStorage.removeItem(STORAGE_KEYS.jwt)
-  localStorage.removeItem(STORAGE_KEYS.user)
-  localStorage.removeItem(STORAGE_KEYS.refreshToken)
+  localStorage.removeItem(LS_KEYS.JWT)
+  localStorage.removeItem(LS_KEYS.USER)
+  localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
   delete apiClient.defaults.headers.common.Authorization
 }
 
@@ -191,11 +166,10 @@ export function AuthProvider({ children }) {
       }
     }
 
-    const token = localStorage.getItem(STORAGE_KEYS.jwt)
-    const userRaw = localStorage.getItem(STORAGE_KEYS.user)
+    const token = localStorage.getItem(LS_KEYS.JWT)
+    const userRaw = localStorage.getItem(LS_KEYS.USER)
 
     console.log('[AUTH] INIT STORAGE', {
-      storagePrefix: STORAGE_PREFIX,
       hasToken: !!token,
       hasUser: !!userRaw,
     })
@@ -481,9 +455,9 @@ export function AuthProvider({ children }) {
     clearStoredAuth()
 
     console.log('[AUTH] STORAGE CLEARED', {
-      jwt: localStorage.getItem(STORAGE_KEYS.jwt),
-      user: localStorage.getItem(STORAGE_KEYS.user),
-      refreshToken: localStorage.getItem(STORAGE_KEYS.refreshToken),
+      jwt: localStorage.getItem(LS_KEYS.JWT),
+      user: localStorage.getItem(LS_KEYS.USER),
+      refreshToken: localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
     })
 
     websocketService.disconnect()
