@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { authService } from '@/services/auth'
 import { apiClient } from '@/services/api'
 import { getRoleHome } from '@/utils/helpers'
+import { LS_KEYS } from '@/utils/constants'
 
 export default function OAuthSuccess() {
   const navigate = useNavigate()
@@ -19,6 +20,7 @@ export default function OAuthSuccess() {
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')
       const error = params.get('error')
+      const refreshToken = params.get('refreshToken')
 
       if (error) {
         toast.error('Google sign-in failed')
@@ -33,7 +35,16 @@ export default function OAuthSuccess() {
       }
 
       try {
-        // IMPORTANT: set token before fetching current user
+        // Store token first so any interceptor/auth flow can read it immediately
+        localStorage.setItem(LS_KEYS.JWT, token)
+
+        if (refreshToken) {
+          localStorage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
+        } else {
+          localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+        }
+
+        // Attach token before fetching current user
         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
 
         let user = null
@@ -52,7 +63,14 @@ export default function OAuthSuccess() {
           throw new Error('Failed to fetch user profile')
         }
 
-        const authenticatedUser = completeOAuthLogin(token, user)
+        const authenticatedUser = await completeOAuthLogin(
+          token,
+          user,
+          refreshToken,
+        )
+
+        // Remove token from URL before redirecting
+        window.history.replaceState({}, document.title, '/oauth-success')
 
         toast.success(`Welcome, ${authenticatedUser.name || 'User'}!`)
 
@@ -61,6 +79,9 @@ export default function OAuthSuccess() {
       } catch (error) {
         console.error('OAuth success handling failed:', error)
 
+        localStorage.removeItem(LS_KEYS.JWT)
+        localStorage.removeItem(LS_KEYS.USER)
+        localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
         delete apiClient.defaults.headers.common.Authorization
 
         toast.error(error?.message || 'Google sign-in failed')
