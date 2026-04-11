@@ -5,6 +5,33 @@ import { BACKEND_URL, LS_KEYS } from '@/utils/constants'
 let networkErrLastShown = 0
 const NETWORK_ERR_DEBOUNCE_MS = 5000
 
+function getStoredJwt() {
+  const directJwt = localStorage.getItem(LS_KEYS.JWT)
+  if (directJwt) return directJwt
+
+  const fallbackKey = Object.keys(localStorage).find((key) =>
+    key.endsWith('_jwt'),
+  )
+
+  return fallbackKey ? localStorage.getItem(fallbackKey) : null
+}
+
+function clearStoredJwt() {
+  localStorage.removeItem(LS_KEYS.JWT)
+
+  Object.keys(localStorage)
+    .filter((key) => key.endsWith('_jwt'))
+    .forEach((key) => localStorage.removeItem(key))
+
+  Object.keys(localStorage)
+    .filter((key) => key.endsWith('_user'))
+    .forEach((key) => localStorage.removeItem(key))
+
+  Object.keys(localStorage)
+    .filter((key) => key.endsWith('_refresh_token'))
+    .forEach((key) => localStorage.removeItem(key))
+}
+
 export const apiClient = axios.create({
   baseURL: BACKEND_URL,
   timeout: 60000,
@@ -14,10 +41,10 @@ export const apiClient = axios.create({
   },
 })
 
-// 🔐 Attach JWT automatically, but skip public auth endpoints
+// Attach JWT automatically, but skip public auth endpoints
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(LS_KEYS.JWT)
+    const token = getStoredJwt()
 
     const url = config.url || ''
     const isPublicAuthEndpoint =
@@ -40,17 +67,15 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// 🎯 Handle responses globally
+// Handle responses globally
 apiClient.interceptors.response.use(
   (response) => {
     const body = response.data
 
-    // ✅ Standard unwrap { success, data }
     if (body && typeof body === 'object' && 'success' in body) {
       return body.data
     }
 
-    // ✅ Handle plain string responses
     if (typeof body === 'string') {
       return body
     }
@@ -87,8 +112,7 @@ apiClient.interceptors.response.use(
     switch (true) {
       case status === 401:
         if (!isPublicAuthEndpoint) {
-          localStorage.removeItem(LS_KEYS.JWT)
-          localStorage.removeItem(LS_KEYS.USER)
+          clearStoredJwt()
           delete apiClient.defaults.headers.common.Authorization
 
           if (!onAuthPage) {
@@ -131,7 +155,6 @@ apiClient.interceptors.response.use(
   },
 )
 
-// 🚨 DEBUG WRAPPER
 const api = {
   get: (url, config) => {
     if (!url) {
