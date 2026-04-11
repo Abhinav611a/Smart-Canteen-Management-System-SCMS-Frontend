@@ -43,29 +43,35 @@ const AdminAnalytics = lazy(() => import('@/pages/admin/AdminAnalytics'))
 const NotFound = lazy(() => import('@/pages/NotFound'))
 
 function RequireRole({ role, children }) {
-  const { isAuthenticated, role: userRole, loading } = useAuth()
+  const { isAuthenticated, user, loading } = useAuth()
+  const userRole = user?.role
 
   if (loading) return <PageLoader />
   if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!userRole) return <Navigate to="/login" replace />
   if (userRole !== role) return <Navigate to={getRoleHome(userRole)} replace />
 
   return children
 }
 
 function PublicOnly({ children }) {
-  const { isAuthenticated, role, loading } = useAuth()
+  const { isAuthenticated, user, loading } = useAuth()
+  const role = user?.role
 
   if (loading) return <PageLoader />
-  if (isAuthenticated) return <Navigate to={getRoleHome(role)} replace />
+  if (isAuthenticated && role) {
+    return <Navigate to={getRoleHome(role)} replace />
+  }
 
   return children
 }
 
 function RootRedirect() {
-  const { isAuthenticated, role, loading } = useAuth()
+  const { isAuthenticated, user, loading } = useAuth()
+  const role = user?.role
 
   if (loading) return <PageLoader />
-  return <Navigate to={isAuthenticated ? getRoleHome(role) : '/login'} replace />
+  return <Navigate to={isAuthenticated && role ? getRoleHome(role) : '/login'} replace />
 }
 
 export default function AppRoutes() {
