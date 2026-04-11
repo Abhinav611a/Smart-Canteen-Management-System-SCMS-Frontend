@@ -19,8 +19,12 @@ export default function OAuthSuccess() {
     const handleOAuthSuccess = async () => {
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')
-      const error = params.get('error')
       const refreshToken = params.get('refreshToken')
+      const error = params.get('error')
+
+      console.log('[OAUTH] URL', window.location.href)
+      console.log('[OAUTH] token exists:', !!token)
+      console.log('[OAUTH] refreshToken exists:', !!refreshToken)
 
       if (error) {
         toast.error('Google sign-in failed')
@@ -35,27 +39,26 @@ export default function OAuthSuccess() {
       }
 
       try {
+        // Store tokens FIRST
         localStorage.setItem(LS_KEYS.JWT, token)
 
-        if (refreshToken) {
+        if (refreshToken && refreshToken.trim().length > 10) {
           localStorage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
         } else {
           localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
         }
 
+        console.log('[OAUTH] stored jwt:', !!localStorage.getItem(LS_KEYS.JWT))
+        console.log(
+          '[OAUTH] stored refresh:',
+          !!localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
+        )
+
+        // Attach access token immediately
         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
 
-        let user = null
-
-        for (let i = 0; i < 2; i++) {
-          try {
-            user = await authService.getCurrentUser()
-            if (user) break
-          } catch (err) {
-            if (i === 1) throw err
-            await new Promise((resolve) => setTimeout(resolve, 300))
-          }
-        }
+        // Fetch current user only AFTER token storage
+        const user = await authService.getCurrentUser()
 
         if (!user) {
           throw new Error('Failed to fetch user profile')
