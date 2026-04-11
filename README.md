@@ -251,3 +251,5 @@ Backend base URL: `http://localhost:8080/api` (proxied in dev via Vite)
 
 The app works fully offline in dev mode using `DUMMY_*` data in `src/utils/dummyData.js`.
 To switch to real API, remove the dummy fallback in `src/services/auth.js` and `src/hooks/useOrders.js`.
+#   S m a r t - C a n t e e n - M a n a g e m e n t - S y s t e m - S C M S - F r o n t e n d  
+ 
