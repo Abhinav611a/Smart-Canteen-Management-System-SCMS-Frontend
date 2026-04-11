@@ -5,8 +5,15 @@ import { BACKEND_URL, LS_KEYS } from '@/utils/constants'
 let networkErrLastShown = 0
 const NETWORK_ERR_DEBOUNCE_MS = 5000
 
+let isRefreshing = false
+let refreshPromise = null
+
 function getStoredJwt() {
   return localStorage.getItem(LS_KEYS.JWT)
+}
+
+function getStoredRefreshToken() {
+  return localStorage.getItem(LS_KEYS.REFRESH_TOKEN)
 }
 
 function clearStoredAuthStorage() {
@@ -16,6 +23,18 @@ function clearStoredAuthStorage() {
   if (LS_KEYS.REFRESH_TOKEN) {
     localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
   }
+}
+
+function isPublicAuthEndpoint(url = '') {
+  return (
+    url.includes('/users/register') ||
+    url.includes('/users/login') ||
+    url.includes('/users/verify-email') ||
+    url.includes('/users/resend-otp') ||
+    url.includes('/users/forgot-password') ||
+    url.includes('/users/reset-password') ||
+    url.includes('/users/refresh')
+  )
 }
 
 export const apiClient = axios.create({
@@ -30,18 +49,9 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = getStoredJwt()
-
     const url = config.url || ''
-    const isPublicAuthEndpoint =
-      url.includes('/users/register') ||
-      url.includes('/users/login') ||
-      url.includes('/users/verify-email') ||
-      url.includes('/users/resend-otp') ||
-      url.includes('/users/forgot-password') ||
-      url.includes('/users/reset-password') ||
-      url.includes('/users/refresh')
 
-    if (token && !isPublicAuthEndpoint) {
+    if (token && !isPublicAuthEndpoint(url)) {
       config.headers = config.headers || {}
       config.headers.Authorization = `Bearer ${token}`
     } else if (config.headers?.Authorization) {
@@ -52,6 +62,43 @@ apiClient.interceptors.request.use(
   },
   (error) => Promise.reject(error),
 )
+
+async function refreshAccessToken() {
+  const refreshToken = getStoredRefreshToken()
+
+  if (!refreshToken) {
+    throw new Error('No refresh token available')
+  }
+
+  const response = await axios.post(
+    `${BACKEND_URL}/users/refresh`,
+    { refreshToken },
+    {
+      timeout: 60000,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    },
+  )
+
+  const body = response.data
+  const data =
+    body && typeof body === 'object' && 'success' in body ? body.data : body
+
+  const newAccessToken = data?.accessToken || data?.token || null
+  const newRefreshToken = data?.refreshToken || refreshToken
+
+  if (!newAccessToken) {
+    throw new Error('Refresh response missing access token')
+  }
+
+  localStorage.setItem(LS_KEYS.JWT, newAccessToken)
+  localStorage.setItem(LS_KEYS.REFRESH_TOKEN, newRefreshToken)
+  apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
+
+  return newAccessToken
+}
 
 apiClient.interceptors.response.use(
   (response) => {
@@ -67,10 +114,11 @@ apiClient.interceptors.response.use(
 
     return body
   },
-  (error) => {
+  async (error) => {
     const status = error.response?.status
     const body = error.response?.data
     const url = error.config?.url || ''
+    const originalRequest = error.config || {}
 
     const message =
       body?.message ||
@@ -85,28 +133,42 @@ apiClient.interceptors.response.use(
       window.location.pathname.includes('/reset-password') ||
       window.location.pathname.includes('/oauth-success')
 
-    const isPublicAuthEndpoint =
-      url.includes('/users/register') ||
-      url.includes('/users/login') ||
-      url.includes('/users/verify-email') ||
-      url.includes('/users/resend-otp') ||
-      url.includes('/users/forgot-password') ||
-      url.includes('/users/reset-password') ||
-      url.includes('/users/refresh')
+    if (
+      status === 401 &&
+      !isPublicAuthEndpoint(url) &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true
+
+      try {
+        if (!isRefreshing) {
+          isRefreshing = true
+          refreshPromise = refreshAccessToken().finally(() => {
+            isRefreshing = false
+            refreshPromise = null
+          })
+        }
+
+        const newToken = await refreshPromise
+
+        originalRequest.headers = originalRequest.headers || {}
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+
+        return apiClient(originalRequest)
+      } catch (refreshError) {
+        clearStoredAuthStorage()
+        delete apiClient.defaults.headers.common.Authorization
+
+        if (!onAuthPage) {
+          toast.error('Session expired. Please login again.')
+          window.location.href = '/login'
+        }
+
+        return Promise.reject(refreshError)
+      }
+    }
 
     switch (true) {
-      case status === 401:
-        if (!isPublicAuthEndpoint) {
-          clearStoredAuthStorage()
-          delete apiClient.defaults.headers.common.Authorization
-
-          if (!onAuthPage) {
-            toast.error('Session expired. Please login again.')
-            window.location.href = '/login'
-          }
-        }
-        break
-
       case status === 403:
         toast.error('You do not have permission to perform this action.')
         break
