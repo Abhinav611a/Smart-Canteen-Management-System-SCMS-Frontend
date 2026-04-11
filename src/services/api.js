@@ -7,6 +7,28 @@ const NETWORK_ERR_DEBOUNCE_MS = 5000
 
 let isRefreshing = false
 let refreshPromise = null
+let silentRefreshTimer = null
+
+function decodeJwtPayload(token) {
+  try {
+    const base64 = token.split('.')[1]
+    const normalized = base64.replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(normalized))
+  } catch {
+    return null
+  }
+}
+
+function persistTokenMetadata(token) {
+  localStorage.setItem(LS_KEYS.JWT, token)
+
+  const payload = decodeJwtPayload(token)
+  if (payload?.exp) {
+    localStorage.setItem(LS_KEYS.TOKEN_EXPIRY, String(payload.exp * 1000))
+  } else {
+    localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
+  }
+}
 
 function getStoredJwt() {
   return localStorage.getItem(LS_KEYS.JWT)
@@ -19,10 +41,8 @@ function getStoredRefreshToken() {
 function clearStoredAuthStorage() {
   localStorage.removeItem(LS_KEYS.JWT)
   localStorage.removeItem(LS_KEYS.USER)
-
-  if (LS_KEYS.REFRESH_TOKEN) {
-    localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
-  }
+  localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+  localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
 }
 
 function isPublicAuthEndpoint(url = '') {
@@ -35,6 +55,37 @@ function isPublicAuthEndpoint(url = '') {
     url.includes('/users/reset-password') ||
     url.includes('/users/refresh')
   )
+}
+
+export function stopSilentRefresh() {
+  if (silentRefreshTimer) {
+    clearTimeout(silentRefreshTimer)
+    silentRefreshTimer = null
+  }
+}
+
+export function scheduleSilentRefresh(refreshFn) {
+  stopSilentRefresh()
+
+  const expiry = Number(localStorage.getItem(LS_KEYS.TOKEN_EXPIRY))
+  if (!expiry) return
+
+  const timeLeft = expiry - Date.now()
+  const refreshTime = timeLeft - 60_000
+
+  if (refreshTime <= 0) {
+    refreshFn().catch(() => {})
+    return
+  }
+
+  silentRefreshTimer = window.setTimeout(async () => {
+    try {
+      await refreshFn()
+      scheduleSilentRefresh(refreshFn)
+    } catch {
+      stopSilentRefresh()
+    }
+  }, refreshTime)
 }
 
 export const apiClient = axios.create({
@@ -63,7 +114,7 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-async function refreshAccessToken() {
+export async function refreshAccessTokenSilently() {
   const refreshToken = getStoredRefreshToken()
 
   if (!refreshToken) {
@@ -93,7 +144,7 @@ async function refreshAccessToken() {
     throw new Error('Refresh response missing access token')
   }
 
-  localStorage.setItem(LS_KEYS.JWT, newAccessToken)
+  persistTokenMetadata(newAccessToken)
   localStorage.setItem(LS_KEYS.REFRESH_TOKEN, newRefreshToken)
   apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
 
@@ -118,7 +169,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status
     const body = error.response?.data
     const url = error.config?.url || ''
-    const originalRequest = error.config || {}
+    const originalRequest = error.config || ''
 
     const message =
       body?.message ||
@@ -143,7 +194,7 @@ apiClient.interceptors.response.use(
       try {
         if (!isRefreshing) {
           isRefreshing = true
-          refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = refreshAccessTokenSilently().finally(() => {
             isRefreshing = false
             refreshPromise = null
           })

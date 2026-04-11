@@ -8,7 +8,7 @@ import React, {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/auth'
-import { apiClient } from '@/services/api'
+import { apiClient, refreshAccessTokenSilently, scheduleSilentRefresh, stopSilentRefresh } from '@/services/api'
 import { websocketService } from '@/services/websocketService'
 import { LS_KEYS } from '@/utils/constants'
 
@@ -82,10 +82,31 @@ function normalizeUser(user = {}) {
   }
 }
 
+function decodeJwtPayload(token) {
+  try {
+    const base64 = token.split('.')[1]
+    const normalized = base64.replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(normalized))
+  } catch {
+    return null
+  }
+}
+
+function persistTokenMetadata(token) {
+  localStorage.setItem(LS_KEYS.JWT, token)
+
+  const payload = decodeJwtPayload(token)
+  if (payload?.exp) {
+    localStorage.setItem(LS_KEYS.TOKEN_EXPIRY, String(payload.exp * 1000))
+  } else {
+    localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
+  }
+}
+
 function persistAuth(token, user, refreshToken = null) {
   const normalizedUser = normalizeUser(user)
 
-  localStorage.setItem(LS_KEYS.JWT, token)
+  persistTokenMetadata(token)
   localStorage.setItem(LS_KEYS.USER, JSON.stringify(normalizedUser))
 
   if (refreshToken) {
@@ -103,6 +124,7 @@ function clearStoredAuth() {
   localStorage.removeItem(LS_KEYS.JWT)
   localStorage.removeItem(LS_KEYS.USER)
   localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+  localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
   delete apiClient.defaults.headers.common.Authorization
 }
 
@@ -146,6 +168,13 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  const startSilentRefresh = useCallback(() => {
+    scheduleSilentRefresh(async () => {
+      const newToken = await refreshAccessTokenSilently()
+      return newToken
+    })
+  }, [])
+
   useEffect(() => {
     console.log('[AUTH] INIT START')
 
@@ -163,6 +192,7 @@ export function AuthProvider({ children }) {
       return () => {
         websocketService.disconnect()
         wsTriedRef.current = false
+        stopSilentRefresh()
       }
     }
 
@@ -189,6 +219,7 @@ export function AuthProvider({ children }) {
 
         console.log('[AUTH] INIT SUCCESS', { user })
         connectWebSocket(token, user, 'INIT')
+        startSilentRefresh()
       } catch (error) {
         console.error('[AUTH] INIT PARSE FAILED', error)
 
@@ -212,8 +243,9 @@ export function AuthProvider({ children }) {
     return () => {
       websocketService.disconnect()
       wsTriedRef.current = false
+      stopSilentRefresh()
     }
-  }, [connectWebSocket])
+  }, [connectWebSocket, startSilentRefresh])
 
   const clearError = useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' })
@@ -235,6 +267,7 @@ export function AuthProvider({ children }) {
       clearStoredAuth()
       websocketService.disconnect()
       wsTriedRef.current = false
+      stopSilentRefresh()
 
       const { token, refreshToken, user } = await authService.login(trimmedCredentials)
 
@@ -257,6 +290,7 @@ export function AuthProvider({ children }) {
       })
 
       await connectWebSocket(token, normalizedUser, 'LOGIN')
+      startSilentRefresh()
 
       console.log('[AUTH] LOGIN SUCCESS')
       return normalizedUser
@@ -270,7 +304,7 @@ export function AuthProvider({ children }) {
 
       throw err
     }
-  }, [connectWebSocket])
+  }, [connectWebSocket, startSilentRefresh])
 
   const register = useCallback(async (data) => {
     dispatch({ type: 'SET_LOADING', value: true })
@@ -427,6 +461,7 @@ export function AuthProvider({ children }) {
     clearStoredAuth()
     websocketService.disconnect()
     wsTriedRef.current = false
+    stopSilentRefresh()
 
     const normalizedUser = persistAuth(token, user, refreshToken)
 
@@ -437,10 +472,11 @@ export function AuthProvider({ children }) {
     })
 
     await connectWebSocket(token, normalizedUser, 'OAUTH')
+    startSilentRefresh()
 
     console.log('[AUTH] OAUTH LOGIN SUCCESS', normalizedUser)
     return normalizedUser
-  }, [connectWebSocket])
+  }, [connectWebSocket, startSilentRefresh])
 
   const logout = useCallback(async () => {
     console.log('[AUTH] LOGOUT START')
@@ -462,6 +498,7 @@ export function AuthProvider({ children }) {
 
     websocketService.disconnect()
     wsTriedRef.current = false
+    stopSilentRefresh()
 
     dispatch({ type: 'LOGOUT' })
     console.log('[AUTH] LOGOUT DISPATCHED')
