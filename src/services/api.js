@@ -35,7 +35,18 @@ function getStoredJwt() {
 }
 
 function getStoredRefreshToken() {
-  return localStorage.getItem(LS_KEYS.REFRESH_TOKEN)
+  const refreshToken = localStorage.getItem(LS_KEYS.REFRESH_TOKEN)
+
+  console.log(
+    '[API] getStoredRefreshToken',
+    {
+      key: LS_KEYS.REFRESH_TOKEN,
+      exists: !!refreshToken,
+      value: refreshToken,
+    },
+  )
+
+  return refreshToken
 }
 
 function clearStoredAuthStorage() {
@@ -74,7 +85,9 @@ export function scheduleSilentRefresh(refreshFn) {
   const refreshTime = timeLeft - 60_000
 
   if (refreshTime <= 0) {
-    refreshFn().catch(() => {})
+    refreshFn().catch((error) => {
+      console.error('[API] immediate silent refresh failed', error)
+    })
     return
   }
 
@@ -82,7 +95,8 @@ export function scheduleSilentRefresh(refreshFn) {
     try {
       await refreshFn()
       scheduleSilentRefresh(refreshFn)
-    } catch {
+    } catch (error) {
+      console.error('[API] scheduled silent refresh failed', error)
       stopSilentRefresh()
     }
   }, refreshTime)
@@ -121,6 +135,8 @@ export async function refreshAccessTokenSilently() {
     throw new Error('No refresh token available')
   }
 
+  console.log('[API] refreshing access token...')
+
   const response = await axios.post(
     `${BACKEND_URL}/users/refresh`,
     { refreshToken },
@@ -148,6 +164,8 @@ export async function refreshAccessTokenSilently() {
   localStorage.setItem(LS_KEYS.REFRESH_TOKEN, newRefreshToken)
   apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
 
+  console.log('[API] token refresh success')
+
   return newAccessToken
 }
 
@@ -169,7 +187,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status
     const body = error.response?.data
     const url = error.config?.url || ''
-    const originalRequest = error.config || ''
+    const originalRequest = error.config || {}
 
     const message =
       body?.message ||
@@ -207,6 +225,8 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest)
       } catch (refreshError) {
+        console.error('[API] refresh failed', refreshError)
+
         clearStoredAuthStorage()
         delete apiClient.defaults.headers.common.Authorization
 
