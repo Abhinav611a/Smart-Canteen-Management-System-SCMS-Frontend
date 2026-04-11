@@ -39,7 +39,11 @@ export default function OAuthSuccess() {
       }
 
       try {
-        // Store tokens FIRST
+        console.log('[OAUTH] LS_KEYS', LS_KEYS)
+        console.log('[OAUTH] refresh key name:', LS_KEYS.REFRESH_TOKEN)
+        console.log('[OAUTH] refresh token raw:', refreshToken)
+
+        // Store tokens first
         localStorage.setItem(LS_KEYS.JWT, token)
 
         if (refreshToken && refreshToken.trim().length > 10) {
@@ -48,16 +52,18 @@ export default function OAuthSuccess() {
           localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
         }
 
-        console.log('[OAUTH] stored jwt:', !!localStorage.getItem(LS_KEYS.JWT))
+        console.log('[OAUTH] stored jwt key:', LS_KEYS.JWT)
+        console.log('[OAUTH] stored refresh key:', LS_KEYS.REFRESH_TOKEN)
+        console.log('[OAUTH] stored jwt:', localStorage.getItem(LS_KEYS.JWT))
         console.log(
-          '[OAUTH] stored refresh:',
-          !!localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
+          '[OAUTH] stored refresh value:',
+          localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
         )
 
         // Attach access token immediately
         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
 
-        // Fetch current user only AFTER token storage
+        // Fetch current user only after token storage
         const user = await authService.getCurrentUser()
 
         if (!user) {
@@ -68,6 +74,11 @@ export default function OAuthSuccess() {
           token,
           user,
           refreshToken,
+        )
+
+        console.log(
+          '[OAUTH] refresh after completeOAuthLogin:',
+          localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
         )
 
         window.history.replaceState({}, document.title, '/oauth-success')
