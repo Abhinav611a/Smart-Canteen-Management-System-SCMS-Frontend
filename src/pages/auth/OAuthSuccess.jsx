@@ -35,7 +35,6 @@ export default function OAuthSuccess() {
       }
 
       try {
-        // Store token first so any interceptor/auth flow can read it immediately
         localStorage.setItem(LS_KEYS.JWT, token)
 
         if (refreshToken) {
@@ -44,7 +43,6 @@ export default function OAuthSuccess() {
           localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
         }
 
-        // Attach token before fetching current user
         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
 
         let user = null
@@ -69,7 +67,6 @@ export default function OAuthSuccess() {
           refreshToken,
         )
 
-        // Remove token from URL before redirecting
         window.history.replaceState({}, document.title, '/oauth-success')
 
         toast.success(`Welcome, ${authenticatedUser.name || 'User'}!`)
