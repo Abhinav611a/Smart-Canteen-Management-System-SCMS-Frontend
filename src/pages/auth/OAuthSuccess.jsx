@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext'
 import { authService } from '@/services/auth'
 import { apiClient } from '@/services/api'
 import { getRoleHome } from '@/utils/helpers'
-import { LS_KEYS } from '@/utils/constants'
 
 export default function OAuthSuccess() {
   const navigate = useNavigate()
@@ -39,31 +38,8 @@ export default function OAuthSuccess() {
       }
 
       try {
-        console.log('[OAUTH] LS_KEYS', LS_KEYS)
-        console.log('[OAUTH] refresh key name:', LS_KEYS.REFRESH_TOKEN)
-        console.log('[OAUTH] refresh token raw:', refreshToken)
-
-        // Store tokens first
-        localStorage.setItem(LS_KEYS.JWT, token)
-
-        if (refreshToken && refreshToken.trim().length > 10) {
-          localStorage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
-        } else {
-          localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
-        }
-
-        console.log('[OAUTH] stored jwt key:', LS_KEYS.JWT)
-        console.log('[OAUTH] stored refresh key:', LS_KEYS.REFRESH_TOKEN)
-        console.log('[OAUTH] stored jwt:', localStorage.getItem(LS_KEYS.JWT))
-        console.log(
-          '[OAUTH] stored refresh value:',
-          localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
-        )
-
-        // Attach access token immediately
         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
 
-        // Fetch current user only after token storage
         const user = await authService.getCurrentUser()
 
         if (!user) {
@@ -73,27 +49,18 @@ export default function OAuthSuccess() {
         const authenticatedUser = await completeOAuthLogin(
           token,
           user,
-          refreshToken,
-        )
-
-        console.log(
-          '[OAUTH] refresh after completeOAuthLogin:',
-          localStorage.getItem(LS_KEYS.REFRESH_TOKEN),
+          refreshToken || null,
         )
 
         window.history.replaceState({}, document.title, '/oauth-success')
 
-        toast.success(`Welcome, ${authenticatedUser.name || 'User'}!`)
-
-        const redirectPath = getRoleHome(authenticatedUser.role) || '/'
+        const redirectPath = getRoleHome(authenticatedUser?.role) || '/'
         window.location.replace(redirectPath)
       } catch (error) {
         console.error('OAuth success handling failed:', error)
 
-        localStorage.removeItem(LS_KEYS.JWT)
-        localStorage.removeItem(LS_KEYS.USER)
-        localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
         delete apiClient.defaults.headers.common.Authorization
+        sessionStorage.removeItem('canteen_oauth_in_progress')
 
         toast.error(error?.message || 'Google sign-in failed')
         navigate('/login', { replace: true })
