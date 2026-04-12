@@ -113,11 +113,20 @@ apiClient.interceptors.request.use(
     const token = getStoredJwt()
     const url = config.url || ''
 
+    config.headers = config.headers || {}
+
+    const explicitAuthHeader =
+      config.headers.Authorization ||
+      config.headers.authorization ||
+      apiClient.defaults.headers.common.Authorization
+
+    if (explicitAuthHeader) {
+      config.headers.Authorization = explicitAuthHeader
+      return config
+    }
+
     if (token && !isPublicAuthEndpoint(url)) {
-      config.headers = config.headers || {}
       config.headers.Authorization = `Bearer ${token}`
-    } else if (config.headers?.Authorization) {
-      delete config.headers.Authorization
     }
 
     return config

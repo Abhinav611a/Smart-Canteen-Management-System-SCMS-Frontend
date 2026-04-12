@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
-import { authService } from '@/services/auth'
 import { apiClient } from '@/services/api'
 import { getRoleHome } from '@/utils/helpers'
+import { LS_KEYS } from '@/utils/constants'
 
 export default function OAuthSuccess() {
   const navigate = useNavigate()
@@ -38,9 +38,19 @@ export default function OAuthSuccess() {
       }
 
       try {
-        apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
+        sessionStorage.setItem(LS_KEYS.JWT, token)
 
-        const user = await authService.getCurrentUser()
+        if (refreshToken && refreshToken.trim().length > 10) {
+          sessionStorage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
+        } else {
+          sessionStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+        }
+
+        const user = await apiClient.get('/users/me', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
 
         if (!user) {
           throw new Error('Failed to fetch user profile')
@@ -59,8 +69,11 @@ export default function OAuthSuccess() {
       } catch (error) {
         console.error('OAuth success handling failed:', error)
 
+        sessionStorage.removeItem(LS_KEYS.JWT)
+        sessionStorage.removeItem(LS_KEYS.USER)
+        sessionStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+        sessionStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
         delete apiClient.defaults.headers.common.Authorization
-        sessionStorage.removeItem('canteen_oauth_in_progress')
 
         toast.error(error?.message || 'Google sign-in failed')
         navigate('/login', { replace: true })
