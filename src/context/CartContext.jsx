@@ -41,7 +41,7 @@ function cartReducer(state, action) {
           items: state.items.map((item) =>
             item.id === action.item.id
               ? { ...item, qty: nextQty, quantity: nextQty }
-              : item
+              : item,
           ),
         }
       }
@@ -67,7 +67,7 @@ function cartReducer(state, action) {
             : state.items.map((item) =>
                 item.id === action.id
                   ? { ...item, qty: action.qty, quantity: action.qty }
-                  : item
+                  : item,
               ),
       }
 
@@ -181,7 +181,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole]
+    [isCartRole],
   )
 
   const removeItem = useCallback(
@@ -205,7 +205,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole]
+    [isCartRole],
   )
 
   const updateQty = useCallback(
@@ -233,37 +233,23 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole]
+    [isCartRole],
   )
 
   const clearCart = useCallback(async () => {
-    if (!cartService.isBackendEnabled() || !isCartRole) {
-      dispatch({ type: 'CLEAR' })
-      return
-    }
-
-    dispatch({ type: 'SET_SYNCING', value: true })
-
-    try {
-      await cartService.clearCart(itemsRef.current)
-      dispatch({ type: 'CLEAR' })
-    } catch (error) {
-      toast.error(error.message || 'Failed to clear cart.')
-      throw error
-    } finally {
-      dispatch({ type: 'SET_SYNCING', value: false })
-    }
-  }, [isCartRole])
+    dispatch({ type: 'CLEAR' })
+    localStorage.removeItem(LS_KEYS.CART)
+  }, [])
 
   const total = state.items.reduce(
     (sum, item) =>
       sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
-    0
+    0,
   )
 
   const count = state.items.reduce(
     (sum, item) => sum + (item.qty || item.quantity || 0),
-    0
+    0,
   )
 
   return (
