@@ -126,7 +126,6 @@ function clearStoredAuth() {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState)
   const wsTriedRef = useRef(false)
-  const oauthInProgressRef = useRef(false)
   const navigate = useNavigate()
 
   const connectWebSocket = useCallback(async (token, user) => {
@@ -151,15 +150,6 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    if (oauthInProgressRef.current) {
-      console.log('[AUTH] INIT SKIPPED - OAuth in progress')
-      return () => {
-        websocketService.disconnect()
-        wsTriedRef.current = false
-        stopSilentRefresh()
-      }
-    }
-
     console.log('[AUTH] INIT START')
 
     const token = localStorage.getItem(LS_KEYS.JWT)
@@ -217,35 +207,28 @@ export function AuthProvider({ children }) {
         throw new Error('OAuth login requires token and user')
       }
 
-      oauthInProgressRef.current = true
+      websocketService.disconnect()
+      wsTriedRef.current = false
+      stopSilentRefresh()
 
-      try {
-        websocketService.disconnect()
-        wsTriedRef.current = false
-        stopSilentRefresh()
+      const normalizedUser = persistAuth(token, user, refreshToken)
 
-        const normalizedUser = persistAuth(token, user, refreshToken)
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        user: normalizedUser,
+        token,
+      })
 
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          user: normalizedUser,
-          token,
-        })
+      await connectWebSocket(token, normalizedUser)
+      startSilentRefresh()
 
-        await connectWebSocket(token, normalizedUser)
-        startSilentRefresh()
-
-        console.log('[AUTH] OAUTH LOGIN SUCCESS')
-        return normalizedUser
-      } finally {
-        oauthInProgressRef.current = false
-      }
+      console.log('[AUTH] OAUTH LOGIN SUCCESS')
+      return normalizedUser
     },
     [connectWebSocket, startSilentRefresh]
   )
 
   const logout = useCallback(() => {
-    oauthInProgressRef.current = false
     clearStoredAuth()
     websocketService.disconnect()
     wsTriedRef.current = false
