@@ -22,6 +22,7 @@ const StudentMenu = lazy(() => import('@/pages/student/Menu'))
 const StudentCart = lazy(() => import('@/pages/student/Cart'))
 const StudentOrders = lazy(() => import('@/pages/student/Orders'))
 const StudentProfile = lazy(() => import('@/pages/student/Profile'))
+const OrderInvoices = lazy(() => import('@/pages/student/OrderInvoices'))
 
 // Manager
 const ChefLayout = lazy(() => import('@/components/layout/ChefLayout'))
@@ -71,7 +72,12 @@ function RootRedirect() {
   const role = user?.role
 
   if (loading) return <PageLoader />
-  return <Navigate to={isAuthenticated && role ? getRoleHome(role) : '/login'} replace />
+  return (
+    <Navigate
+      to={isAuthenticated && role ? getRoleHome(role) : '/login'}
+      replace
+    />
+  )
 }
 
 export default function AppRoutes() {
@@ -131,6 +137,7 @@ export default function AppRoutes() {
             <Route path="menu" element={<StudentMenu />} />
             <Route path="cart" element={<StudentCart />} />
             <Route path="orders" element={<StudentOrders />} />
+            <Route path="invoices" element={<OrderInvoices />} />
             <Route path="profile" element={<StudentProfile />} />
           </Route>
 
