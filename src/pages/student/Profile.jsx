@@ -22,7 +22,6 @@ export default function StudentProfile() {
     .reduce((s, o) => s + (o.total ?? 0), 0)
 
   const completed = orders.filter((o) => o.status === 'COMPLETED').length
-  const cancelled = orders.filter((o) => o.status === 'CANCELLED').length
   const activeCount = orders.filter((o) =>
     ['PENDING', 'PREPARING', 'READY'].includes(o.status),
   ).length
@@ -160,10 +159,10 @@ export default function StudentProfile() {
         <div className="glass-card p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-900 dark:text-white">
-              Recent Orders
+              Order Invoice
             </h3>
             <button
-              onClick={() => navigate('/student/orders')}
+              onClick={() => navigate('/student/invoices')}
               className="text-xs text-brand-500 hover:text-brand-600 font-medium"
             >
               View All →
@@ -195,7 +194,8 @@ export default function StudentProfile() {
                     type="button"
                     onClick={() => handleDownloadInvoice(o.id)}
                     disabled={
-                      downloadingInvoiceId === o.id || o.canDownloadInvoice === false
+                      downloadingInvoiceId === o.id ||
+                      o.canDownloadInvoice === false
                     }
                     className="px-3 py-1.5 rounded-lg border border-brand-500 text-brand-500 hover:bg-brand-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                   >
