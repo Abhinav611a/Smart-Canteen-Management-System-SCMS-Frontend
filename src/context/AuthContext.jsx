@@ -7,12 +7,14 @@ import React, {
   useRef,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { authService } from '@/services/auth'
 import {
   apiClient,
   refreshAccessTokenSilently,
   scheduleSilentRefresh,
   stopSilentRefresh,
+  clearStoredAuthStorage,
 } from '@/services/api'
 import { websocketService } from '@/services/websocketService'
 import { LS_KEYS } from '@/utils/constants'
@@ -66,6 +68,10 @@ function authReducer(state, action) {
   }
 }
 
+function getAuthStorage() {
+  return sessionStorage
+}
+
 function sanitizeRole(role) {
   return String(role || '').trim().toUpperCase()
 }
@@ -88,26 +94,29 @@ function decodeJwtPayload(token) {
 }
 
 function persistTokenMetadata(token) {
-  localStorage.setItem(LS_KEYS.JWT, token)
+  const storage = getAuthStorage()
+
+  storage.setItem(LS_KEYS.JWT, token)
 
   const payload = decodeJwtPayload(token)
   if (payload?.exp) {
-    localStorage.setItem(LS_KEYS.TOKEN_EXPIRY, String(payload.exp * 1000))
+    storage.setItem(LS_KEYS.TOKEN_EXPIRY, String(payload.exp * 1000))
   } else {
-    localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
+    storage.removeItem(LS_KEYS.TOKEN_EXPIRY)
   }
 }
 
 function persistAuth(token, user, refreshToken = null) {
+  const storage = getAuthStorage()
   const normalizedUser = normalizeUser(user)
 
   persistTokenMetadata(token)
-  localStorage.setItem(LS_KEYS.USER, JSON.stringify(normalizedUser))
+  storage.setItem(LS_KEYS.USER, JSON.stringify(normalizedUser))
 
   if (refreshToken) {
-    localStorage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
+    storage.setItem(LS_KEYS.REFRESH_TOKEN, refreshToken)
   } else {
-    localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
+    storage.removeItem(LS_KEYS.REFRESH_TOKEN)
   }
 
   apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
@@ -116,10 +125,7 @@ function persistAuth(token, user, refreshToken = null) {
 }
 
 function clearStoredAuth() {
-  localStorage.removeItem(LS_KEYS.JWT)
-  localStorage.removeItem(LS_KEYS.USER)
-  localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
-  localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
+  clearStoredAuthStorage()
   delete apiClient.defaults.headers.common.Authorization
 }
 
@@ -152,8 +158,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     console.log('[AUTH] INIT START')
 
-    const token = localStorage.getItem(LS_KEYS.JWT)
-    const userRaw = localStorage.getItem(LS_KEYS.USER)
+    const storage = getAuthStorage()
+    const token = storage.getItem(LS_KEYS.JWT)
+    const userRaw = storage.getItem(LS_KEYS.USER)
 
     console.log('[AUTH] INIT STORAGE', {
       hasToken: !!token,
@@ -201,6 +208,63 @@ export function AuthProvider({ children }) {
     }
   }, [connectWebSocket, startSilentRefresh])
 
+  const login = useCallback(
+    async (credentials) => {
+      dispatch({ type: 'SET_LOADING', value: true })
+
+      try {
+        websocketService.disconnect()
+        wsTriedRef.current = false
+        stopSilentRefresh()
+        clearStoredAuth()
+
+        const result = await authService.login(credentials)
+
+        const token = result?.token
+        const refreshToken = result?.refreshToken || null
+        const rawUser = result?.user || { email: credentials?.email }
+        const user = normalizeUser(rawUser)
+
+        if (!token) {
+          throw new Error('Login response missing token')
+        }
+
+        const persistedUser = persistAuth(token, user, refreshToken)
+
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          user: persistedUser,
+          token,
+        })
+
+        await connectWebSocket(token, persistedUser)
+        startSilentRefresh()
+
+        const displayName =
+          persistedUser?.name ||
+          persistedUser?.email ||
+          'User'
+
+        toast.success(`Welcome back, ${displayName}!`)
+
+        return persistedUser
+      } catch (error) {
+        clearStoredAuth()
+        websocketService.disconnect()
+        wsTriedRef.current = false
+        stopSilentRefresh()
+
+        dispatch({
+          type: 'SET_ERROR',
+          error: error?.message || 'Login failed',
+        })
+
+        throw error
+      }
+    },
+    [connectWebSocket, startSilentRefresh]
+  )
+
   const completeOAuthLogin = useCallback(
     async (token, user, refreshToken = null) => {
       if (!token || !user) {
@@ -210,6 +274,7 @@ export function AuthProvider({ children }) {
       websocketService.disconnect()
       wsTriedRef.current = false
       stopSilentRefresh()
+      clearStoredAuth()
 
       const normalizedUser = persistAuth(token, user, refreshToken)
 
@@ -222,7 +287,12 @@ export function AuthProvider({ children }) {
       await connectWebSocket(token, normalizedUser)
       startSilentRefresh()
 
-      console.log('[AUTH] OAUTH LOGIN SUCCESS')
+      const displayName =
+        normalizedUser?.name ||
+        normalizedUser?.email ||
+        'User'
+
+      toast.success(`Welcome back, ${displayName}!`)
       return normalizedUser
     },
     [connectWebSocket, startSilentRefresh]
@@ -243,7 +313,7 @@ export function AuthProvider({ children }) {
       value={{
         ...state,
         isAuthenticated: !!state.user,
-        login: authService.login,
+        login,
         logout,
         completeOAuthLogin,
       }}

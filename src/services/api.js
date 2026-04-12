@@ -19,41 +19,38 @@ function decodeJwtPayload(token) {
   }
 }
 
+function getAuthStorage() {
+  return sessionStorage
+}
+
 function persistTokenMetadata(token) {
-  localStorage.setItem(LS_KEYS.JWT, token)
+  const storage = getAuthStorage()
+
+  storage.setItem(LS_KEYS.JWT, token)
 
   const payload = decodeJwtPayload(token)
   if (payload?.exp) {
-    localStorage.setItem(LS_KEYS.TOKEN_EXPIRY, String(payload.exp * 1000))
+    storage.setItem(LS_KEYS.TOKEN_EXPIRY, String(payload.exp * 1000))
   } else {
-    localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
+    storage.removeItem(LS_KEYS.TOKEN_EXPIRY)
   }
 }
 
 function getStoredJwt() {
-  return localStorage.getItem(LS_KEYS.JWT)
+  return getAuthStorage().getItem(LS_KEYS.JWT)
 }
 
 function getStoredRefreshToken() {
-  const refreshToken = localStorage.getItem(LS_KEYS.REFRESH_TOKEN)
-
-  console.log(
-    '[API] getStoredRefreshToken',
-    {
-      key: LS_KEYS.REFRESH_TOKEN,
-      exists: !!refreshToken,
-      value: refreshToken,
-    },
-  )
-
-  return refreshToken
+  return getAuthStorage().getItem(LS_KEYS.REFRESH_TOKEN)
 }
 
-function clearStoredAuthStorage() {
-  localStorage.removeItem(LS_KEYS.JWT)
-  localStorage.removeItem(LS_KEYS.USER)
-  localStorage.removeItem(LS_KEYS.REFRESH_TOKEN)
-  localStorage.removeItem(LS_KEYS.TOKEN_EXPIRY)
+export function clearStoredAuthStorage() {
+  const storage = getAuthStorage()
+
+  storage.removeItem(LS_KEYS.JWT)
+  storage.removeItem(LS_KEYS.USER)
+  storage.removeItem(LS_KEYS.REFRESH_TOKEN)
+  storage.removeItem(LS_KEYS.TOKEN_EXPIRY)
 }
 
 function isPublicAuthEndpoint(url = '') {
@@ -78,7 +75,7 @@ export function stopSilentRefresh() {
 export function scheduleSilentRefresh(refreshFn) {
   stopSilentRefresh()
 
-  const expiry = Number(localStorage.getItem(LS_KEYS.TOKEN_EXPIRY))
+  const expiry = Number(getAuthStorage().getItem(LS_KEYS.TOKEN_EXPIRY))
   if (!expiry) return
 
   const timeLeft = expiry - Date.now()
@@ -135,8 +132,6 @@ export async function refreshAccessTokenSilently() {
     throw new Error('No refresh token available')
   }
 
-  console.log('[API] refreshing access token...')
-
   const response = await axios.post(
     `${BACKEND_URL}/users/refresh`,
     { refreshToken },
@@ -161,10 +156,8 @@ export async function refreshAccessTokenSilently() {
   }
 
   persistTokenMetadata(newAccessToken)
-  localStorage.setItem(LS_KEYS.REFRESH_TOKEN, newRefreshToken)
+  getAuthStorage().setItem(LS_KEYS.REFRESH_TOKEN, newRefreshToken)
   apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
-
-  console.log('[API] token refresh success')
 
   return newAccessToken
 }

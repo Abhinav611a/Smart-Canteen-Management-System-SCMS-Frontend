@@ -149,6 +149,7 @@ export const LS_KEYS = {
   JWT: `${STORAGE_PREFIX}_jwt`,
   USER: `${STORAGE_PREFIX}_user`,
   REFRESH_TOKEN: `${STORAGE_PREFIX}_refresh_token`,
+  TOKEN_EXPIRY: `${STORAGE_PREFIX}_token_expiry`,
   THEME: 'canteen_theme',
   CART: 'canteen_cart',
 }

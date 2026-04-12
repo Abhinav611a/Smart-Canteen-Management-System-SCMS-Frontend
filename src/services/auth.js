@@ -33,7 +33,7 @@ export const authService = {
     return {
       token: data?.accessToken || null,
       refreshToken: data?.refreshToken || null,
-      user: data?.user ? normaliseUser(data.user) : null,
+      user: data?.user ? normaliseUser(data.user) : { email },
     }
   },
 
