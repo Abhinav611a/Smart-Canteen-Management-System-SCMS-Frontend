@@ -80,13 +80,14 @@ function cartReducer(state, action) {
 }
 
 export function CartProvider({ children }) {
-  const { isAuthenticated, role } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const [state, dispatch] = useReducer(cartReducer, initialState)
-  const isCartRole = role === 'student'
+
+  const role = String(user?.role || '').trim().toUpperCase()
+  const isCartRole = role === 'USER'
 
   const itemsRef = useRef(state.items)
   const hydratedRef = useRef(false)
-  
 
   useEffect(() => {
     itemsRef.current = state.items
@@ -255,7 +256,8 @@ export function CartProvider({ children }) {
   }, [isCartRole])
 
   const total = state.items.reduce(
-    (sum, item) => sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
+    (sum, item) =>
+      sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
     0
   )
 

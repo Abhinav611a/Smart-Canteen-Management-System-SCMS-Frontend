@@ -1,0 +1,464 @@
+warning: in the working copy of 'src/context/AuthContext.jsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/context/AuthContext.jsx b/src/context/AuthContext.jsx[m
+[1mindex c6c4d28..bbdf132 100644[m
+[1m--- a/src/context/AuthContext.jsx[m
+[1m+++ b/src/context/AuthContext.jsx[m
+[36m@@ -8,7 +8,12 @@[m [mimport React, {[m
+ } from 'react'[m
+ import { useNavigate } from 'react-router-dom'[m
+ import { authService } from '@/services/auth'[m
+[31m-import { apiClient, refreshAccessTokenSilently, scheduleSilentRefresh, stopSilentRefresh } from '@/services/api'[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  apiClient,[m
+[32m+[m[32m  refreshAccessTokenSilently,[m
+[32m+[m[32m  scheduleSilentRefresh,[m
+[32m+[m[32m  stopSilentRefresh,[m
+[32m+[m[32m} from '@/services/api'[m
+ import { websocketService } from '@/services/websocketService'[m
+ import { LS_KEYS } from '@/utils/constants'[m
+ [m
+[36m@@ -48,23 +53,13 @@[m [mfunction authReducer(state, action) {[m
+       }[m
+ [m
+     case 'SET_LOADING':[m
+[31m-      return {[m
+[31m-        ...state,[m
+[31m-        loading: action.value,[m
+[31m-      }[m
+[32m+[m[32m      return { ...state, loading: action.value }[m
+ [m
+     case 'SET_ERROR':[m
+[31m-      return {[m
+[31m-        ...state,[m
+[31m-        error: action.error,[m
+[31m-        loading: false,[m
+[31m-      }[m
+[32m+[m[32m      return { ...state, error: action.error, loading: false }[m
+ [m
+     case 'CLEAR_ERROR':[m
+[31m-      return {[m
+[31m-        ...state,[m
+[31m-        error: null,[m
+[31m-      }[m
+[32m+[m[32m      return { ...state, error: null }[m
+ [m
+     default:[m
+       return state[m
+[36m@@ -128,67 +123,36 @@[m [mfunction clearStoredAuth() {[m
+   delete apiClient.defaults.headers.common.Authorization[m
+ }[m
+ [m
+[31m-function isOAuthInProgress() {[m
+[31m-  const { pathname, search, hash } = window.location[m
+[31m-[m
+[31m-  return ([m
+[31m-    pathname.toLowerCase().includes('oauth') ||[m
+[31m-    pathname.toLowerCase().includes('callback') ||[m
+[31m-    search.toLowerCase().includes('token=') ||[m
+[31m-    search.toLowerCase().includes('accesstoken=') ||[m
+[31m-    search.toLowerCase().includes('refreshtoken=') ||[m
+[31m-    hash.toLowerCase().includes('token=')[m
+[31m-  )[m
+[31m-}[m
+[31m-[m
+ export function AuthProvider({ children }) {[m
+   const [state, dispatch] = useReducer(authReducer, initialState)[m
+   const wsTriedRef = useRef(false)[m
+[32m+[m[32m  const oauthInProgressRef = useRef(false)[m
+   const navigate = useNavigate()[m
+ [m
+[31m-  const connectWebSocket = useCallback(async (token, user, source = 'UNKNOWN') => {[m
+[32m+[m[32m  const connectWebSocket = useCallback(async (token, user) => {[m
+     websocketService.disconnect()[m
+     wsTriedRef.current = false[m
+ [m
+[31m-    if (!token || !user) {[m
+[31m-      console.log(`[AUTH] WS ${source} SKIPPED - missing token or user`)[m
+[31m-      return[m
+[31m-    }[m
+[31m-[m
+[31m-    if (wsTriedRef.current) return[m
+[32m+[m[32m    if (!token || !user) return[m
+ [m
+     wsTriedRef.current = true[m
+ [m
+     try {[m
+       await websocketService.connect(token, user)[m
+[31m-      console.log(`[AUTH] WS ${source} CONNECTED`, { role: user?.role })[m
+[31m-    } catch (error) {[m
+[31m-      console.warn(`[AUTH] WS ${source} CONNECT FAILED`, error)[m
+[32m+[m[32m    } catch {[m
+       wsTriedRef.current = false[m
+     }[m
+   }, [])[m
+ [m
+   const startSilentRefresh = useCallback(() => {[m
+     scheduleSilentRefresh(async () => {[m
+[31m-      const newToken = await refreshAccessTokenSilently()[m
+[31m-      return newToken[m
+[32m+[m[32m      return await refreshAccessTokenSilently()[m
+     })[m
+   }, [])[m
+ [m
+   useEffect(() => {[m
+[31m-    console.log('[AUTH] INIT START')[m
+[31m-[m
+[31m-    if (isOAuthInProgress()) {[m
+[32m+[m[32m    if (oauthInProgressRef.current) {[m
+       console.log('[AUTH] INIT SKIPPED - OAuth in progress')[m
+[31m-[m
+[31m-      clearStoredAuth()[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'INIT',[m
+[31m-        user: null,[m
+[31m-        token: null,[m
+[31m-      })[m
+[31m-[m
+       return () => {[m
+         websocketService.disconnect()[m
+         wsTriedRef.current = false[m
+[36m@@ -196,6 +160,8 @@[m [mexport function AuthProvider({ children }) {[m
+       }[m
+     }[m
+ [m
+[32m+[m[32m    console.log('[AUTH] INIT START')[m
+[32m+[m
+     const token = localStorage.getItem(LS_KEYS.JWT)[m
+     const userRaw = localStorage.getItem(LS_KEYS.USER)[m
+ [m
+[36m@@ -206,8 +172,7 @@[m [mexport function AuthProvider({ children }) {[m
+ [m
+     if (token && userRaw) {[m
+       try {[m
+[31m-        const storedUser = JSON.parse(userRaw)[m
+[31m-        const user = normalizeUser(storedUser)[m
+[32m+[m[32m        const user = normalizeUser(JSON.parse(userRaw))[m
+ [m
+         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`[m
+ [m
+[36m@@ -218,11 +183,10 @@[m [mexport function AuthProvider({ children }) {[m
+         })[m
+ [m
+         console.log('[AUTH] INIT SUCCESS', { user })[m
+[31m-        connectWebSocket(token, user, 'INIT')[m
+[32m+[m[32m        connectWebSocket(token, user)[m
+         startSilentRefresh()[m
+       } catch (error) {[m
+         console.error('[AUTH] INIT PARSE FAILED', error)[m
+[31m-[m
+         clearStoredAuth()[m
+ [m
+         dispatch({[m
+[36m@@ -247,295 +211,67 @@[m [mexport function AuthProvider({ children }) {[m
+     }[m
+   }, [connectWebSocket, startSilentRefresh])[m
+ [m
+[31m-  const clearError = useCallback(() => {[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-  }, [])[m
+[31m-[m
+[31m-  const login = useCallback(async (credentials) => {[m
+[31m-    dispatch({ type: 'SET_LOADING', value: true })[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-    console.log('[AUTH] LOGIN START')[m
+[31m-[m
+[31m-    try {[m
+[31m-      const trimmedCredentials = {[m
+[31m-        email: credentials.email?.trim() || '',[m
+[31m-        password: credentials.password || '',[m
+[31m-      }[m
+[31m-[m
+[31m-      console.log('[AUTH] BEFORE authService.login', trimmedCredentials)[m
+[31m-[m
+[31m-      clearStoredAuth()[m
+[31m-      websocketService.disconnect()[m
+[31m-      wsTriedRef.current = false[m
+[31m-      stopSilentRefresh()[m
+[31m-[m
+[31m-      const { token, refreshToken, user } = await authService.login(trimmedCredentials)[m
+[31m-[m
+[31m-      console.log('[AUTH] AFTER authService.login', {[m
+[31m-        token: !!token,[m
+[31m-        refreshToken: !!refreshToken,[m
+[31m-        user,[m
+[31m-      })[m
+[31m-[m
+[32m+[m[32m  const completeOAuthLogin = useCallback([m
+[32m+[m[32m    async (token, user, refreshToken = null) => {[m
+       if (!token || !user) {[m
+[31m-        throw new Error('Login response missing token or user')[m
+[32m+[m[32m        throw new Error('OAuth login requires token and user')[m
+       }[m
+ [m
+[31m-      const normalizedUser = persistAuth(token, user, refreshToken)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'LOGIN_SUCCESS',[m
+[31m-        user: normalizedUser,[m
+[31m-        token,[m
+[31m-      })[m
+[31m-[m
+[31m-      await connectWebSocket(token, normalizedUser, 'LOGIN')[m
+[31m-      startSilentRefresh()[m
+[32m+[m[32m      oauthInProgressRef.current = true[m
+ [m
+[31m-      console.log('[AUTH] LOGIN SUCCESS')[m
+[31m-      return normalizedUser[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] LOGIN ERROR', err)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_ERROR',[m
+[31m-        error: err?.message || 'Login failed',[m
+[31m-      })[m
+[31m-[m
+[31m-      throw err[m
+[31m-    }[m
+[31m-  }, [connectWebSocket, startSilentRefresh])[m
+[31m-[m
+[31m-  const register = useCallback(async (data) => {[m
+[31m-    dispatch({ type: 'SET_LOADING', value: true })[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-    console.log('[AUTH] REGISTER START')[m
+[32m+[m[32m      try {[m
+[32m+[m[32m        websocketService.disconnect()[m
+[32m+[m[32m        wsTriedRef.current = false[m
+[32m+[m[32m        stopSilentRefresh()[m
+ [m
+[31m-    try {[m
+[31m-      const response = await authService.register({[m
+[31m-        name: data.name?.trim() || '',[m
+[31m-        email: data.email?.trim() || '',[m
+[31m-        password: data.password || '',[m
+[31m-      })[m
+[32m+[m[32m        const normalizedUser = persistAuth(token, user, refreshToken)[m
+ [m
+[31m-      dispatch({[m
+[31m-        type: 'SET_LOADING',[m
+[31m-        value: false,[m
+[31m-      })[m
+[32m+[m[32m        dispatch({[m
+[32m+[m[32m          type: 'LOGIN_SUCCESS',[m
+[32m+[m[32m          user: normalizedUser,[m
+[32m+[m[32m          token,[m
+[32m+[m[32m        })[m
+ [m
+[31m-      console.log('[AUTH] REGISTER SUCCESS - OTP SENT', response)[m
+[32m+[m[32m        await connectWebSocket(token, normalizedUser)[m
+[32m+[m[32m        startSilentRefresh()[m
+ [m
+[31m-      return {[m
+[31m-        email: data.email?.trim() || '',[m
+[31m-        ...response,[m
+[32m+[m[32m        console.log('[AUTH] OAUTH LOGIN SUCCESS')[m
+[32m+[m[32m        return normalizedUser[m
+[32m+[m[32m      } finally {[m
+[32m+[m[32m        oauthInProgressRef.current = false[m
+       }[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] REGISTER ERROR', err)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_ERROR',[m
+[31m-        error: err?.message || 'Registration failed',[m
+[31m-      })[m
+[31m-[m
+[31m-      throw err[m
+[31m-    }[m
+[31m-  }, [])[m
+[31m-[m
+[31m-  const verifyEmail = useCallback(async ({ email, otp }) => {[m
+[31m-    dispatch({ type: 'SET_LOADING', value: true })[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-    console.log('[AUTH] VERIFY EMAIL START')[m
+[31m-[m
+[31m-    try {[m
+[31m-      const response = await authService.verifyEmail({[m
+[31m-        email: email?.trim() || '',[m
+[31m-        otp: otp?.trim() || '',[m
+[31m-      })[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_LOADING',[m
+[31m-        value: false,[m
+[31m-      })[m
+[31m-[m
+[31m-      console.log('[AUTH] VERIFY EMAIL SUCCESS', response)[m
+[31m-      return response[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] VERIFY EMAIL ERROR', err)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_ERROR',[m
+[31m-        error: err?.message || 'Email verification failed',[m
+[31m-      })[m
+[31m-[m
+[31m-      throw err[m
+[31m-    }[m
+[31m-  }, [])[m
+[31m-[m
+[31m-  const forgotPassword = useCallback(async (email) => {[m
+[31m-    dispatch({ type: 'SET_LOADING', value: true })[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-    console.log('[AUTH] FORGOT PASSWORD START')[m
+[31m-[m
+[31m-    try {[m
+[31m-      const response = await authService.forgotPassword(email?.trim() || '')[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_LOADING',[m
+[31m-        value: false,[m
+[31m-      })[m
+[31m-[m
+[31m-      console.log('[AUTH] FORGOT PASSWORD SUCCESS', response)[m
+[31m-      return response[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] FORGOT PASSWORD ERROR', err)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_ERROR',[m
+[31m-        error: err?.message || 'Failed to send OTP',[m
+[31m-      })[m
+[31m-[m
+[31m-      throw err[m
+[31m-    }[m
+[31m-  }, [])[m
+[31m-[m
+[31m-  const resetPassword = useCallback(async ({ email, otp, newPassword }) => {[m
+[31m-    dispatch({ type: 'SET_LOADING', value: true })[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-    console.log('[AUTH] RESET PASSWORD START')[m
+[31m-[m
+[31m-    try {[m
+[31m-      const response = await authService.resetPassword({[m
+[31m-        email: email?.trim() || '',[m
+[31m-        otp: otp?.trim() || '',[m
+[31m-        newPassword: newPassword || '',[m
+[31m-      })[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_LOADING',[m
+[31m-        value: false,[m
+[31m-      })[m
+[31m-[m
+[31m-      console.log('[AUTH] RESET PASSWORD SUCCESS', response)[m
+[31m-      return response[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] RESET PASSWORD ERROR', err)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_ERROR',[m
+[31m-        error: err?.message || 'Password reset failed',[m
+[31m-      })[m
+[31m-[m
+[31m-      throw err[m
+[31m-    }[m
+[31m-  }, [])[m
+[31m-[m
+[31m-  const resendOtp = useCallback(async ({ email, type }) => {[m
+[31m-    dispatch({ type: 'CLEAR_ERROR' })[m
+[31m-    console.log('[AUTH] RESEND OTP START', { email, type })[m
+[31m-[m
+[31m-    try {[m
+[31m-      const response = await authService.resendOtp({[m
+[31m-        email: email?.trim() || '',[m
+[31m-        type,[m
+[31m-      })[m
+[31m-[m
+[31m-      console.log('[AUTH] RESEND OTP SUCCESS', response)[m
+[31m-      return response[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] RESEND OTP ERROR', err)[m
+[31m-[m
+[31m-      dispatch({[m
+[31m-        type: 'SET_ERROR',[m
+[31m-        error: err?.message || 'Failed to resend OTP',[m
+[31m-      })[m
+[31m-[m
+[31m-      throw err[m
+[31m-    }[m
+[31m-  }, [])[m
+[31m-[m
+[31m-  const completeOAuthLogin = useCallback(async (token, user, refreshToken = null) => {[m
+[31m-    if (!token || !user) {[m
+[31m-      throw new Error('OAuth login requires token and user')[m
+[31m-    }[m
+[31m-[m
+[31m-    clearStoredAuth()[m
+[31m-    websocketService.disconnect()[m
+[31m-    wsTriedRef.current = false[m
+[31m-    stopSilentRefresh()[m
+[31m-[m
+[31m-    const normalizedUser = persistAuth(token, user, refreshToken)[m
+[31m-[m
+[31m-    dispatch({[m
+[31m-      type: 'LOGIN_SUCCESS',[m
+[31m-      user: normalizedUser,[m
+[31m-      token,[m
+[31m-    })[m
+[31m-[m
+[31m-    await connectWebSocket(token, normalizedUser, 'OAUTH')[m
+[31m-    startSilentRefresh()[m
+[31m-[m
+[31m-    console.log('[AUTH] OAUTH LOGIN SUCCESS', normalizedUser)[m
+[31m-    return normalizedUser[m
+[31m-  }, [connectWebSocket, startSilentRefresh])[m
+[31m-[m
+[31m-  const logout = useCallback(async () => {[m
+[31m-    console.log('[AUTH] LOGOUT START')[m
+[31m-[m
+[31m-    try {[m
+[31m-      await authService.logout()[m
+[31m-      console.log('[AUTH] LOGOUT API SUCCESS')[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[AUTH] LOGOUT API FAILED', err)[m
+[31m-    }[m
+[32m+[m[32m    },[m
+[32m+[m[32m    [connectWebSocket, startSilentRefresh][m
+[32m+[m[32m  )[m
+ [m
+[32m+[m[32m  const logout = useCallback(() => {[m
+[32m+[m[32m    oauthInProgressRef.current = false[m
+     clearStoredAuth()[m
+[31m-[m
+[31m-    console.log('[AUTH] STORAGE CLEARED', {[m
+[31m-      jwt: localStorage.getItem(LS_KEYS.JWT),[m
+[31m-      user: localStorage.getItem(LS_KEYS.USER),[m
+[31m-      refreshToken: localStorage.getItem(LS_KEYS.REFRESH_TOKEN),[m
+[31m-    })[m
+[31m-[m
+     websocketService.disconnect()[m
+     wsTriedRef.current = false[m
+     stopSilentRefresh()[m
+ [m
+     dispatch({ type: 'LOGOUT' })[m
+[31m-    console.log('[AUTH] LOGOUT DISPATCHED')[m
+[31m-[m
+     navigate('/login', { replace: true })[m
+[31m-    console.log('[AUTH] NAVIGATE LOGIN')[m
+   }, [navigate])[m
+ [m
+[31m-  const value = {[m
+[31m-    user: state.user,[m
+[31m-    token: state.token,[m
+[31m-    loading: state.loading,[m
+[31m-    error: state.error,[m
+[31m-    isAuthenticated: !!state.user,[m
+[31m-    role: state.user?.role ?? null,[m
+[31m-    isUser: sanitizeRole(state.user?.role) === 'USER',[m
+[31m-    isAdmin: sanitizeRole(state.user?.role) === 'ADMIN',[m
+[31m-    isManager: sanitizeRole(state.user?.role) === 'MANAGER',[m
+[31m-    isKitchen: sanitizeRole(state.user?.role) === 'KITCHEN',[m
+[31m-    login,[m
+[31m-    register,[m
+[31m-    verifyEmail,[m
+[31m-    forgotPassword,[m
+[31m-    resetPassword,[m
+[31m-    resendOtp,[m
+[31m-    logout,[m
+[31m-    clearError,[m
+[31m-    completeOAuthLogin,[m
+[31m-  }[m
+[31m-[m
+[31m-  return <AuthContext.Provider value={value}>{childr
