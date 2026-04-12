@@ -265,6 +265,46 @@ export function AuthProvider({ children }) {
     [connectWebSocket, startSilentRefresh]
   )
 
+  const register = useCallback(async (payload) => {
+    dispatch({ type: 'SET_LOADING', value: true })
+
+    try {
+      const result = await authService.register(payload)
+      dispatch({ type: 'CLEAR_ERROR' })
+      return result
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: error?.message || 'Registration failed',
+      })
+      throw error
+    } finally {
+      dispatch({ type: 'SET_LOADING', value: false })
+    }
+  }, [])
+
+  const verifyEmail = useCallback(async (payload) => {
+    dispatch({ type: 'SET_LOADING', value: true })
+
+    try {
+      const result = await authService.verifyEmail(payload)
+      dispatch({ type: 'CLEAR_ERROR' })
+      return result
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: error?.message || 'Email verification failed',
+      })
+      throw error
+    } finally {
+      dispatch({ type: 'SET_LOADING', value: false })
+    }
+  }, [])
+
+  const resendOtp = useCallback(async (payload) => {
+    return await authService.resendOtp(payload)
+  }, [])
+
   const completeOAuthLogin = useCallback(
     async (token, user, refreshToken = null) => {
       if (!token || !user) {
@@ -314,6 +354,9 @@ export function AuthProvider({ children }) {
         ...state,
         isAuthenticated: !!state.user,
         login,
+        register,
+        verifyEmail,
+        resendOtp,
         logout,
         completeOAuthLogin,
       }}
