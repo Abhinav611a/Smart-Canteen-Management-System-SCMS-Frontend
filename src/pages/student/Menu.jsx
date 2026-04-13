@@ -79,7 +79,7 @@ export default function StudentMenu() {
   }
 
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-5 pb-24 lg:space-y-6 lg:pb-6">
       <section className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -269,11 +269,8 @@ export default function StudentMenu() {
                         </button>
 
                         <div className="text-center">
-                          <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-600/80">
-                            In Cart
-                          </p>
-                          <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
-                            {qty}
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                            In Cart • {qty}
                           </p>
                         </div>
 
@@ -291,7 +288,7 @@ export default function StudentMenu() {
                         type="button"
                         onClick={() => handleAdd(item)}
                         disabled={!item.available}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
                       >
                         <Plus size={16} />
                         Add to Cart

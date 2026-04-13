@@ -23,7 +23,7 @@ export default function StudentProfile() {
 
   const completed = orders.filter((o) => o.status === 'COMPLETED').length
   const activeCount = orders.filter((o) =>
-    ['PENDING', 'PREPARING', 'READY'].includes(o.status),
+    ['PENDING', 'PREPARING', 'READY'].includes(o.status)
   ).length
 
   const stats = [
@@ -43,7 +43,7 @@ export default function StudentProfile() {
       icon: '✅',
       label: 'Completed',
       value: completed,
-      color: 'text-brand-600 dark:text-brand-400',
+      color: 'text-emerald-600 dark:text-emerald-400',
     },
     {
       icon: '🔄',
@@ -72,31 +72,35 @@ export default function StudentProfile() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <h2 className="section-title">My Profile 👤</h2>
+    <div className="mx-auto max-w-2xl space-y-6 animate-fade-in">
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+        My Profile 👤
+      </h2>
 
-      <div className="glass-card p-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center gap-5">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white text-3xl font-bold shrink-0 shadow-glow">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-3xl font-bold text-white shadow-sm">
             {getInitials(user?.name)}
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
               {user?.name}
             </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {user?.email}
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="badge badge-green capitalize">
+            <div className="mt-2 flex items-center gap-2">
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold capitalize text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
                 {user?.role?.toLowerCase()}
               </span>
-              <span className="badge badge-gray">ID #{user?.id}</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-gray-800 dark:text-slate-300">
+                ID #{user?.id}
+              </span>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:text-red-500 border border-red-200 dark:border-red-800 rounded-xl transition-colors"
+            className="hidden items-center gap-1.5 rounded-xl border border-red-200 px-3 py-1.5 text-sm text-red-400 transition-colors hover:text-red-500 dark:border-red-800 sm:flex"
           >
             Sign out
           </button>
@@ -112,11 +116,14 @@ export default function StudentProfile() {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="glass-card p-4 flex items-center gap-3">
+            <div
+              key={s.label}
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+            >
               <span className="text-2xl">{s.icon}</span>
               <div>
                 <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {s.label}
                 </p>
               </div>
@@ -125,8 +132,8 @@ export default function StudentProfile() {
         </div>
       )}
 
-      <div className="glass-card p-5 space-y-3">
-        <h3 className="font-semibold text-gray-900 dark:text-white">
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h3 className="font-semibold text-slate-900 dark:text-white">
           Account Details
         </h3>
         <div className="space-y-2 text-sm">
@@ -142,12 +149,12 @@ export default function StudentProfile() {
           ].map((row) => (
             <div
               key={row.label}
-              className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800 last:border-0"
+              className="flex justify-between border-b border-slate-100 py-2 last:border-0 dark:border-gray-800"
             >
-              <span className="text-gray-500 dark:text-gray-400">
+              <span className="text-slate-500 dark:text-slate-400">
                 {row.label}
               </span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="font-medium text-slate-900 dark:text-white">
                 {row.value}
               </span>
             </div>
@@ -156,14 +163,14 @@ export default function StudentProfile() {
       </div>
 
       {!ordersLoading && orders.length > 0 && (
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900 dark:text-white">
               Order Invoice
             </h3>
             <button
               onClick={() => navigate('/student/invoices')}
-              className="text-xs text-brand-500 hover:text-brand-600 font-medium"
+              className="text-xs font-medium text-emerald-500 hover:text-emerald-600"
             >
               View All →
             </button>
@@ -173,20 +180,20 @@ export default function StudentProfile() {
             {orders.slice(0, 3).map((o) => (
               <div
                 key={o.id}
-                className="flex items-center justify-between gap-4 text-sm py-2 border-b border-gray-100 dark:border-gray-800 last:border-0"
+                className="flex items-center justify-between gap-4 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-gray-800"
               >
                 <div className="min-w-0">
-                  <div className="text-gray-700 dark:text-gray-300 font-medium">
+                  <div className="font-medium text-slate-700 dark:text-slate-300">
                     {o.orderNumber || `#${o.id}`}
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {o.formattedDate ||
                       new Date(o.createdAt).toLocaleDateString('en-IN')}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="font-semibold text-brand-600 dark:text-brand-400">
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(o.total)}
                   </span>
 
@@ -197,7 +204,7 @@ export default function StudentProfile() {
                       downloadingInvoiceId === o.id ||
                       o.canDownloadInvoice === false
                     }
-                    className="px-3 py-1.5 rounded-lg border border-brand-500 text-brand-500 hover:bg-brand-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                    className="rounded-lg border border-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {downloadingInvoiceId === o.id
                       ? 'Downloading...'
@@ -212,7 +219,7 @@ export default function StudentProfile() {
 
       <button
         onClick={handleLogout}
-        className="sm:hidden w-full py-3 text-red-400 hover:text-red-500 border border-red-200 dark:border-red-800 rounded-xl text-sm font-medium transition-colors"
+        className="w-full rounded-xl border border-red-200 py-3 text-sm font-medium text-red-400 transition-colors hover:text-red-500 dark:border-red-800 sm:hidden"
       >
         Sign Out
       </button>
