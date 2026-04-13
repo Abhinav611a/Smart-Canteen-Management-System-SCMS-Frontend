@@ -2,31 +2,24 @@
  * StudentOrders.jsx
  * ──────────────────
  * Student order history with live updates, reorder, and invoice download.
- *
- * New features from deployed backend:
- *   - orderNumber, statusLabel, formattedDate, shortDescription
- *   - canReorder  → show Reorder button  (POST /orders/{id}/reorder)
- *   - canDownloadInvoice → show Invoice button (GET /orders/{id}/invoice)
- *   - elapsedSeconds + timeStatus → show live timer for active orders
- *   - Real-time status updates via WebSocket
  */
 
 import React, { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { Link } from 'react-router-dom'
+import { RefreshCw, ChevronDown, ChevronUp, Clock3 } from 'lucide-react'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { ordersService } from '@/services/orders'
 import {
   ORDER_STATUS,
   ORDER_STATUS_ICONS,
-  ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
   MENU_CATEGORY_EMOJIS,
 } from '@/utils/constants'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import { SkeletonTable } from '@/components/ui/Skeleton'
-import Button from '@/components/ui/Button'
 
 const STEPS = [
   ORDER_STATUS.PENDING,
@@ -35,11 +28,29 @@ const STEPS = [
   ORDER_STATUS.COMPLETED,
 ]
 
+function getStatusBadgeClass(status) {
+  switch (status) {
+    case ORDER_STATUS.READY:
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+    case ORDER_STATUS.PREPARING:
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+    case ORDER_STATUS.PENDING:
+      return 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400'
+    case ORDER_STATUS.COMPLETED:
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300'
+    case ORDER_STATUS.CANCELLED:
+      return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+    default:
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300'
+  }
+}
+
 function OrderProgress({ status }) {
   if (status === ORDER_STATUS.CANCELLED) {
     return (
-      <div className="flex items-center gap-2 text-xs text-red-500 font-medium">
-        <span>❌</span> Order was cancelled
+      <div className="flex items-center gap-2 text-xs font-medium text-red-500">
+        <span>❌</span>
+        <span>Order was cancelled</span>
       </div>
     )
   }
@@ -47,7 +58,7 @@ function OrderProgress({ status }) {
   const currentIdx = STEPS.indexOf(status)
 
   return (
-    <div className="flex items-center gap-1 mt-1">
+    <div className="mt-2 flex items-center gap-1">
       {STEPS.map((step, i) => {
         const done = i <= currentIdx
         const current = i === currentIdx
@@ -56,23 +67,25 @@ function OrderProgress({ status }) {
           <React.Fragment key={step}>
             <div className="flex items-center gap-1">
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all ${
+                className={[
+                  'flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all',
                   current
-                    ? 'border-brand-500 bg-brand-500 text-white scale-110 shadow-glow'
+                    ? 'scale-110 border-emerald-500 bg-emerald-500 text-white'
                     : done
-                      ? 'border-brand-400 bg-brand-50 dark:bg-brand-900/30 text-brand-600'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-400'
-                }`}
+                      ? 'border-emerald-400 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                      : 'border-slate-200 text-slate-400 dark:border-gray-700',
+                ].join(' ')}
               >
                 {done && !current ? '✓' : i + 1}
               </div>
 
               <span
-                className={`text-[10px] capitalize hidden sm:block ${
+                className={[
+                  'hidden text-[10px] capitalize sm:block',
                   done
-                    ? 'text-brand-600 dark:text-brand-400'
-                    : 'text-gray-400'
-                }`}
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-slate-400',
+                ].join(' ')}
               >
                 {step.toLowerCase()}
               </span>
@@ -80,11 +93,12 @@ function OrderProgress({ status }) {
 
             {i < STEPS.length - 1 && (
               <div
-                className={`flex-1 h-px ${
+                className={[
+                  'h-px flex-1',
                   i < currentIdx
-                    ? 'bg-brand-400'
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`}
+                    ? 'bg-emerald-400'
+                    : 'bg-slate-200 dark:bg-gray-700',
+                ].join(' ')}
               />
             )}
           </React.Fragment>
@@ -105,15 +119,32 @@ function ElapsedTimer({ seconds, timeStatus }) {
 
   return (
     <span
-      className={`text-xs font-mono font-semibold ${
+      className={[
+        'inline-flex items-center gap-1 text-xs font-semibold',
         isLate
           ? 'text-red-500'
-          : 'text-amber-600 dark:text-amber-400'
-      }`}
+          : 'text-amber-600 dark:text-amber-400',
+      ].join(' ')}
     >
-      ⏱ {mins > 0 ? `${mins}m ${secs}s` : `${secs}s`}
-      {timeStatus && <span className="ml-1 font-normal">· {timeStatus}</span>}
+      <Clock3 size={12} />
+      <span className="font-mono">
+        {mins > 0 ? `${mins}m ${secs}s` : `${secs}s`}
+      </span>
+      {timeStatus ? <span className="font-normal">· {timeStatus}</span> : null}
     </span>
+  )
+}
+
+function AnimatedDetail({ open, children }) {
+  return (
+    <motion.div
+      initial={false}
+      animate={{ height: open ? 'auto' : 0, opacity: open ? 1 : 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      style={{ overflow: 'hidden' }}
+    >
+      {children}
+    </motion.div>
   )
 }
 
@@ -194,8 +225,10 @@ export default function StudentOrders() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h2 className="section-title">My Orders 📋</h2>
-        <div className="glass-card p-4">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          My Orders 📦
+        </h2>
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <SkeletonTable rows={5} />
         </div>
       </div>
@@ -203,61 +236,73 @@ export default function StudentOrders() {
   }
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="animate-fade-in space-y-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="section-title">My Orders 📋</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            My Orders 📦
+          </h2>
 
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {orders.length} order{orders.length !== 1 ? 's' : ''}
             </p>
 
             {isConnected && (
-              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live updates
               </span>
             )}
           </div>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={refetch} icon="🔄">
+        <button
+          type="button"
+          onClick={refetch}
+          className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-500/10"
+        >
+          <RefreshCw size={13} />
           Refresh
-        </Button>
+        </button>
       </div>
 
       {error && (
-        <div className="glass-card p-4 text-sm text-red-500 border border-red-200 dark:border-red-900">
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-400">
           ⚠️ {error}
         </div>
       )}
 
       {orders.length === 0 && !error && (
-        <div className="text-center py-24">
+        <div className="py-20 text-center">
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-6xl mb-4"
+            className="mb-4 text-5xl"
           >
-            📋
+            📦
           </motion.div>
 
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
             No orders yet
           </h3>
 
-          <p className="text-gray-400 text-sm">
-            Place your first order from the menu!
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Start by ordering your favorite meal
           </p>
+
+          <Link
+            to="/student/menu"
+            className="mt-4 inline-flex rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+          >
+            Browse Menu
+          </Link>
         </div>
       )}
 
       <div className="space-y-3">
         {orders.map((order) => {
           const isExpanded = expandedId === order.id
-          const statusColor =
-            ORDER_STATUS_COLORS[order.status] ?? 'badge-gray'
           const isActive = [
             ORDER_STATUS.PENDING,
             ORDER_STATUS.PREPARING,
@@ -268,23 +313,30 @@ export default function StudentOrders() {
             <motion.div
               key={order.id}
               layout
-              className={`glass-card overflow-hidden transition-shadow ${
+              className={[
+                'overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow dark:border-gray-800 dark:bg-gray-900',
                 isActive
-                  ? 'ring-1 ring-brand-200 dark:ring-brand-900'
-                  : ''
-              }`}
+                  ? 'ring-1 ring-emerald-200 dark:ring-emerald-500/20'
+                  : '',
+              ].join(' ')}
             >
               <button
-                className="w-full flex items-start justify-between gap-3 p-5 text-left"
+                type="button"
+                className="flex w-full items-start justify-between gap-3 p-4 text-left"
                 onClick={() => setExpandedId(isExpanded ? null : order.id)}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold text-gray-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-slate-900 dark:text-white">
                       {order.orderNumber || `#${order.id}`}
                     </p>
 
-                    <span className={`badge ${statusColor}`}>
+                    <span
+                      className={[
+                        'rounded-full px-2.5 py-1 text-xs font-semibold',
+                        getStatusBadgeClass(order.status),
+                      ].join(' ')}
+                    >
                       {ORDER_STATUS_ICONS[order.status]}{' '}
                       {order.statusLabel ||
                         ORDER_STATUS_LABELS[order.status] ||
@@ -292,91 +344,103 @@ export default function StudentOrders() {
                     </span>
                   </div>
 
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                     {order.formattedDate || formatDateTime(order.createdAt)}
                   </p>
 
-                  {order.shortDescription && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 italic">
+                  {order.shortDescription ? (
+                    <p className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">
                       {order.shortDescription}
                     </p>
-                  )}
+                  ) : null}
 
-                  <div className="mt-2">
-                    <OrderProgress status={order.status} />
-                  </div>
+                  <OrderProgress status={order.status} />
 
-                  {isActive && order.elapsedSeconds > 0 && (
-                    <div className="mt-1">
+                  {isActive && order.elapsedSeconds > 0 ? (
+                    <div className="mt-2">
                       <ElapsedTimer
                         seconds={order.elapsedSeconds}
                         timeStatus={order.timeStatus}
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
-                <div className="text-right shrink-0">
-                  <p className="font-bold text-lg text-gray-900 dark:text-white">
+                <div className="shrink-0 text-right">
+                  <p className="text-base font-bold text-emerald-600">
                     {formatCurrency(order.total)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
                     {order.totalItems} item{order.totalItems !== 1 ? 's' : ''}
                   </p>
-                  <p className="text-xs text-gray-400">
-                    {isExpanded ? '▲ Less' : '▼ Details'}
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp size={12} />
+                        Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={12} />
+                        Details
+                      </>
+                    )}
                   </p>
                 </div>
               </button>
 
               <AnimatedDetail open={isExpanded}>
-                <div className="px-5 pb-5 space-y-3">
-                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-3 space-y-1.5">
-                    {order.items.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <span>{MENU_CATEGORY_EMOJIS[item.category] || '🍴'}</span>
-                          <span>{item.name}</span>
-                        </span>
+                <div className="space-y-3 px-4 pb-4">
+                  <div className="rounded-2xl bg-slate-50 p-3 dark:bg-gray-800">
+                    <div className="space-y-2">
+                      {order.items.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span>
+                              {MENU_CATEGORY_EMOJIS[item.category] || '🍴'}
+                            </span>
+                            <span className="truncate">{item.name}</span>
+                          </span>
 
-                        <span className="font-medium">
-                          {formatCurrency(item.price)}
-                        </span>
-                      </div>
-                    ))}
+                          <span className="shrink-0 font-medium">
+                            {formatCurrency(item.price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-1.5 flex justify-between text-sm font-bold text-gray-900 dark:text-white">
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold text-slate-900 dark:border-gray-700 dark:text-white">
                       <span>Total</span>
                       <span>{formatCurrency(order.total)}</span>
                     </div>
                   </div>
 
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex flex-wrap gap-2">
                     {order.canReorder && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        icon="🔁"
-                        loading={reorderingId === order.id}
+                      <button
+                        type="button"
+                        disabled={reorderingId === order.id}
                         onClick={() => handleReorder(order)}
+                        className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-800 dark:text-slate-200 dark:hover:bg-gray-700"
                       >
-                        Reorder
-                      </Button>
+                        {reorderingId === order.id ? 'Reordering...' : 'Reorder'}
+                      </button>
                     )}
 
                     {order.canDownloadInvoice && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon="🧾"
-                        loading={invoiceId === order.id}
+                      <button
+                        type="button"
+                        disabled={invoiceId === order.id}
                         onClick={() => handleInvoice(order)}
+                        className="rounded-2xl px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-emerald-500/10"
                       >
-                        Invoice
-                      </Button>
+                        {invoiceId === order.id
+                          ? 'Downloading...'
+                          : 'Download Invoice'}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -386,18 +450,5 @@ export default function StudentOrders() {
         })}
       </div>
     </div>
-  )
-}
-
-function AnimatedDetail({ open, children }) {
-  return (
-    <motion.div
-      initial={false}
-      animate={{ height: open ? 'auto' : 0, opacity: open ? 1 : 0 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      style={{ overflow: 'hidden' }}
-    >
-      {children}
-    </motion.div>
   )
 }
