@@ -6,7 +6,6 @@ import { useCart } from '@/context/CartContext'
 import { useNotifications } from '@/context/NotificationContext'
 import { cartService } from '@/services/cartService'
 import { formatCurrency } from '@/utils/helpers'
-import Button from '@/components/ui/Button'
 
 const PAYMENT_METHODS = [
   { value: 'CASH', label: 'Cash', icon: '💵' },
@@ -37,7 +36,7 @@ export default function StudentCart() {
 
       if (!backendCart?.items?.length) {
         toast.error(
-          'Your backend cart is empty. Please add the items again from the menu.',
+          'Your backend cart is empty. Please add the items again from the menu.'
         )
         return
       }
@@ -79,7 +78,7 @@ export default function StudentCart() {
         message.includes('empty cart')
       ) {
         toast.error(
-          'Cart not found on server. Please add items again from the menu.',
+          'Cart not found on server. Please add items again from the menu.'
         )
       } else if (status === 400) {
         toast.error(backendMessage || 'Checkout request is invalid.')
@@ -96,9 +95,9 @@ export default function StudentCart() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="max-w-lg mx-auto"
+        className="mx-auto max-w-lg"
       >
-        <div className="glass-card p-8 text-center space-y-5">
+        <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -109,65 +108,72 @@ export default function StudentCart() {
           </motion.div>
 
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
               Order Placed!
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {placed.orderNumber || `Order #${placed.id}`} has been sent to the
               kitchen.
             </p>
           </div>
 
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-4 text-left space-y-3">
+          <div className="space-y-3 rounded-2xl bg-slate-50 p-4 text-left dark:bg-gray-800">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Order Number</span>
-              <span className="font-semibold text-gray-900 dark:text-white">
+              <span className="text-slate-500 dark:text-slate-400">
+                Order Number
+              </span>
+              <span className="font-semibold text-slate-900 dark:text-white">
                 {placed.orderNumber || `#${placed.id}`}
               </span>
             </div>
 
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Total Paid</span>
-              <span className="font-bold text-brand-600 dark:text-brand-400">
+              <span className="text-slate-500 dark:text-slate-400">
+                Total Paid
+              </span>
+              <span className="font-bold text-emerald-600">
                 {formatCurrency(placed.total ?? placed.totalAmount ?? total)}
               </span>
             </div>
 
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Payment Method</span>
-              <span className="font-semibold text-gray-900 dark:text-white">
+              <span className="text-slate-500 dark:text-slate-400">
+                Payment Method
+              </span>
+              <span className="font-semibold text-slate-900 dark:text-white">
                 {placed.paymentMethod}
               </span>
             </div>
 
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Status</span>
-              <span className="badge badge-yellow">
+              <span className="text-slate-500 dark:text-slate-400">Status</span>
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
                 {placed.statusLabel || placed.status}
               </span>
             </div>
 
             {placed.shortDescription && (
-              <p className="text-xs text-gray-400 italic">
+              <p className="text-xs italic text-slate-400 dark:text-slate-500">
                 {placed.shortDescription}
               </p>
             )}
           </div>
 
           <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              className="flex-1"
+            <button
+              type="button"
+              className="flex-1 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 dark:bg-gray-800 dark:text-slate-200 dark:hover:bg-gray-700"
               onClick={() => navigate('/student/menu')}
             >
               Browse Menu
-            </Button>
-            <Button
-              className="flex-1"
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
               onClick={() => navigate('/student/orders')}
             >
               Track Order
-            </Button>
+            </button>
           </div>
         </div>
       </motion.div>
@@ -176,47 +182,53 @@ export default function StudentCart() {
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-24">
+      <div className="py-24 text-center">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="text-6xl mb-4"
+          className="mb-4 text-6xl"
         >
           🛒
         </motion.div>
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">
           Your cart is empty
         </h3>
-        <p className="text-gray-400 text-sm mb-8">
+        <p className="mb-8 text-sm text-slate-500 dark:text-slate-400">
           Add some delicious items from the menu!
         </p>
-        <Button icon="🍽" onClick={() => navigate('/student/menu')}>
+        <button
+          type="button"
+          onClick={() => navigate('/student/menu')}
+          className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
+        >
           Browse Menu
-        </Button>
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="animate-fade-in space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="section-title">My Cart 🛒</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            My Cart 🛒
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             {count} item{count !== 1 ? 's' : ''}
           </p>
         </div>
 
         <button
           onClick={() => clearCart()}
-          className="text-xs text-red-400 hover:text-red-500 transition-colors font-medium"
+          className="text-xs font-medium text-red-400 transition-colors hover:text-red-500"
           type="button"
         >
           Clear all
         </button>
       </div>
 
-      <div className="glass-card divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <AnimatePresence>
           {items.map((item) => (
             <motion.div
@@ -224,51 +236,51 @@ export default function StudentCart() {
               layout
               exit={{ opacity: 0, x: -20, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex items-center gap-4 p-4"
+              className="flex items-center gap-3 border-b border-slate-100 p-4 last:border-b-0 dark:border-gray-800"
             >
-              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center text-2xl shrink-0">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl dark:bg-gray-800">
                 {item.emoji || '🍴'}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                   {item.name}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
                   {formatCurrency(item.price)} each
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => updateQty(item.id, item.qty - 1)}
                   type="button"
-                  className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-800 font-bold hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors flex items-center justify-center text-sm"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 dark:bg-gray-800"
                 >
                   −
                 </button>
 
-                <span className="w-5 text-center text-sm font-bold text-gray-900 dark:text-white">
+                <span className="w-5 text-center text-sm font-semibold text-slate-900 dark:text-white">
                   {item.qty}
                 </span>
 
                 <button
                   onClick={() => updateQty(item.id, item.qty + 1)}
                   type="button"
-                  className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-800 font-bold hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors flex items-center justify-center text-sm"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 dark:bg-gray-800"
                 >
                   +
                 </button>
               </div>
 
-              <p className="text-sm font-bold text-gray-900 dark:text-white w-16 text-right shrink-0">
+              <p className="w-16 shrink-0 text-right text-sm font-bold text-slate-900 dark:text-white">
                 {formatCurrency(item.price * item.qty)}
               </p>
 
               <button
                 onClick={() => removeItem(item.id)}
                 type="button"
-                className="text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0 ml-1 text-sm"
+                className="ml-1 shrink-0 text-sm text-slate-300 transition-colors hover:text-red-500 dark:text-gray-600"
                 title="Remove item"
               >
                 ✕
@@ -278,36 +290,34 @@ export default function StudentCart() {
         </AnimatePresence>
       </div>
 
-      <div className="glass-card p-5 space-y-5">
-        <h3 className="font-semibold text-gray-900 dark:text-white">
+      <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+        <h3 className="font-semibold text-slate-900 dark:text-white">
           Order Summary
         </h3>
 
         <div className="space-y-2">
-          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400">
             <span>
               Subtotal ({count} item{count !== 1 ? 's' : ''})
             </span>
             <span>{formatCurrency(total)}</span>
           </div>
 
-          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400">
             <span>Delivery</span>
-            <span className="text-green-600 dark:text-green-400 font-medium">
+            <span className="font-medium text-green-600 dark:text-green-400">
               Free
             </span>
           </div>
 
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 flex justify-between font-bold text-base text-gray-900 dark:text-white">
+          <div className="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900 dark:border-gray-800 dark:text-white">
             <span>Total</span>
-            <span className="text-brand-600 dark:text-brand-400">
-              {formatCurrency(total)}
-            </span>
+            <span className="text-emerald-600">{formatCurrency(total)}</span>
           </div>
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">
+          <p className="text-sm font-medium text-slate-900 dark:text-white">
             Payment Method
           </p>
 
@@ -320,10 +330,10 @@ export default function StudentCart() {
                   key={method.value}
                   type="button"
                   onClick={() => setPaymentMethod(method.value)}
-                  className={`rounded-xl border px-3 py-3 text-sm font-medium transition-all flex flex-col items-center justify-center gap-2 ${
+                  className={`flex flex-col items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all ${
                     selected
-                      ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400 dark:border-brand-500'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
                   <span className="text-lg">{method.icon}</span>
@@ -334,17 +344,16 @@ export default function StudentCart() {
           </div>
         </div>
 
-        <Button
-          className="w-full"
-          size="lg"
-          loading={placing || syncing}
+        <button
+          type="button"
           onClick={handlePlaceOrder}
-          icon="🍽"
+          disabled={placing || syncing}
+          className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {placing ? 'Placing Order…' : `Place Order (${paymentMethod})`}
-        </Button>
+        </button>
 
-        <p className="text-xs text-center text-gray-400">
+        <p className="text-center text-xs text-slate-400 dark:text-slate-500">
           Checked out through your backend cart flow
         </p>
       </div>
