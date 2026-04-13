@@ -240,10 +240,7 @@ export function AuthProvider({ children }) {
         await connectWebSocket(token, persistedUser)
         startSilentRefresh()
 
-        const displayName =
-          persistedUser?.name ||
-          persistedUser?.email ||
-          'User'
+        const displayName = persistedUser?.name || persistedUser?.email || 'User'
 
         toast.success(`Welcome back, ${displayName}!`)
 
@@ -301,6 +298,42 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  const forgotPassword = useCallback(async (email) => {
+    dispatch({ type: 'SET_LOADING', value: true })
+
+    try {
+      const result = await authService.forgotPassword(email)
+      dispatch({ type: 'CLEAR_ERROR' })
+      return result
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: error?.message || 'Failed to send OTP',
+      })
+      throw error
+    } finally {
+      dispatch({ type: 'SET_LOADING', value: false })
+    }
+  }, [])
+
+  const resetPassword = useCallback(async (payload) => {
+    dispatch({ type: 'SET_LOADING', value: true })
+
+    try {
+      const result = await authService.resetPassword(payload)
+      dispatch({ type: 'CLEAR_ERROR' })
+      return result
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: error?.message || 'Failed to reset password',
+      })
+      throw error
+    } finally {
+      dispatch({ type: 'SET_LOADING', value: false })
+    }
+  }, [])
+
   const resendOtp = useCallback(async (payload) => {
     return await authService.resendOtp(payload)
   }, [])
@@ -327,10 +360,7 @@ export function AuthProvider({ children }) {
       await connectWebSocket(token, normalizedUser)
       startSilentRefresh()
 
-      const displayName =
-        normalizedUser?.name ||
-        normalizedUser?.email ||
-        'User'
+      const displayName = normalizedUser?.name || normalizedUser?.email || 'User'
 
       toast.success(`Welcome back, ${displayName}!`)
       return normalizedUser
@@ -356,6 +386,8 @@ export function AuthProvider({ children }) {
         login,
         register,
         verifyEmail,
+        forgotPassword,
+        resetPassword,
         resendOtp,
         logout,
         completeOAuthLogin,

@@ -1,51 +1,101 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { authService } from '@/services/auth'
+import { useAuth } from '@/context/AuthContext'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
+const OTP_TYPE_RESET_PASSWORD = 'RESET_PASSWORD'
+const RESEND_COOLDOWN = 30
+
+function maskEmail(email = '') {
+  const [name, domain] = String(email).split('@')
+  if (!name || !domain) return email
+
+  if (name.length <= 2) {
+    return `${name[0] || ''}***@${domain}`
+  }
+
+  return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`
+}
+
 export default function ResetPassword() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { resetPassword, resendOtp } = useAuth()
 
-  const [form, setForm] = useState({
-    email: location.state?.email || '',
-    otp: '',
-    newPassword: '',
-  })
+  const email = useMemo(
+    () => location.state?.email?.trim?.() || '',
+    [location.state]
+  )
 
-  const [errors, setErrors] = useState({})
+  const [otp, setOtp] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
+  const [errors, setErrors] = useState({})
+  const [cooldown, setCooldown] = useState(0)
 
-  const validate = () => {
+  useEffect(() => {
+    if (!email) {
+      navigate('/forgot-password', { replace: true })
+    }
+  }, [email, navigate])
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+
+    const timer = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [cooldown])
+
+  const validateResetStep = () => {
     const nextErrors = {}
 
-    if (!form.email.trim()) nextErrors.email = 'Email is required'
-    if (!form.otp.trim()) nextErrors.otp = 'OTP is required'
-    if (!form.newPassword.trim()) nextErrors.newPassword = 'New password is required'
+    if (!otp.trim()) nextErrors.otp = 'OTP is required'
+    if (!newPassword || newPassword.length < 6) {
+      nextErrors.newPassword = 'Password must be at least 6 characters'
+    }
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = 'Please confirm your password'
+    } else if (newPassword !== confirmPassword) {
+      nextErrors.confirmPassword = 'Passwords do not match'
+    }
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
 
-  const handleSubmit = async (event) => {
+  const handleResetPassword = async (event) => {
     event.preventDefault()
-    if (!validate()) return
+    if (!validateResetStep()) return
 
     setLoading(true)
+
     try {
-      const message = await authService.resetPassword({
-        email: form.email.trim(),
-        otp: form.otp.trim(),
-        newPassword: form.newPassword,
+      await resetPassword({
+        email,
+        otp: otp.trim(),
+        newPassword,
       })
 
-      toast.success(typeof message === 'string' ? message : 'Password reset successful')
-      navigate('/login', { replace: true })
+      toast.success('Password reset successful')
+      navigate('/login', {
+        replace: true,
+        state: { email },
+      })
     } catch (err) {
       toast.error(err.message || 'Failed to reset password')
     } finally {
@@ -54,21 +104,25 @@ export default function ResetPassword() {
   }
 
   const handleResendOtp = async () => {
-    if (!form.email.trim()) {
-      setErrors((prev) => ({ ...prev, email: 'Email is required' }))
-      return
-    }
+    if (!email || cooldown > 0) return
 
     setResending(true)
+
     try {
-      const message = await authService.resendOtp(form.email.trim())
-      toast.success(typeof message === 'string' ? message : 'OTP resent successfully')
+      await resendOtp({
+        email,
+        type: OTP_TYPE_RESET_PASSWORD,
+      })
+      toast.success('OTP resent successfully')
+      setCooldown(RESEND_COOLDOWN)
     } catch (err) {
       toast.error(err.message || 'Failed to resend OTP')
     } finally {
       setResending(false)
     }
   }
+
+  if (!email) return null
 
   return (
     <div className="min-h-screen bg-mesh-light dark:bg-mesh-dark flex items-center justify-center p-4">
@@ -84,30 +138,26 @@ export default function ResetPassword() {
       >
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-brand-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-glow">
-            🔑
+            🔐
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Reset Password
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            Enter OTP and your new password
+            Enter the OTP sent to {maskEmail(email)}
           </p>
         </div>
 
         <div className="glass-card p-6 sm:p-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              id="reset-email"
-              name="email"
-              label="Email Address"
-              type="email"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-              error={errors.email}
-              icon="✉️"
-              autoComplete="email"
-            />
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 px-4 py-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Email Address
+              </p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white break-all">
+                {email}
+              </p>
+            </div>
 
             <Input
               id="reset-otp"
@@ -115,48 +165,64 @@ export default function ResetPassword() {
               label="OTP"
               type="text"
               placeholder="Enter OTP"
-              value={form.otp}
-              onChange={(e) => setForm((prev) => ({ ...prev, otp: e.target.value }))}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
               error={errors.otp}
               icon="🔢"
+              autoComplete="one-time-code"
             />
 
             <Input
-              id="reset-new-password"
+              id="new-password"
               name="newPassword"
               label="New Password"
               type="password"
-              placeholder="••••••••"
-              value={form.newPassword}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, newPassword: e.target.value }))
-              }
+              placeholder="Enter new password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
               error={errors.newPassword}
               icon="🔒"
               autoComplete="new-password"
+              showPasswordToggle
             />
 
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                className="flex-1"
-                onClick={handleResendOtp}
-                loading={resending}
-                disabled={resending}
-              >
-                {resending ? 'Resending…' : 'Resend OTP'}
-              </Button>
+            <Input
+              id="confirm-new-password"
+              name="confirmNewPassword"
+              label="Confirm New Password"
+              type="password"
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              error={errors.confirmPassword}
+              icon="🔒"
+              autoComplete="new-password"
+              showPasswordToggle
+            />
 
-              <Button
-                type="submit"
-                className="flex-1"
-                loading={loading}
-                disabled={loading}
-              >
-                {loading ? 'Resetting…' : 'Reset Password'}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              loading={loading}
+              disabled={loading}
+              size="lg"
+            >
+              {loading ? 'Resetting Password…' : 'Reset Password'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={handleResendOtp}
+              disabled={resending || cooldown > 0}
+            >
+              {resending
+                ? 'Resending OTP…'
+                : cooldown > 0
+                ? `Resend OTP in ${cooldown}s`
+                : 'Resend OTP'}
+            </Button>
           </form>
 
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
