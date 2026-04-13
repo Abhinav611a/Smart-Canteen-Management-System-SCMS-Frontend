@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
@@ -510,22 +510,25 @@ export default function KitchenLayout() {
     }
   }
 
-  const { isConnected } = useWebSocket({
-    onOrderUpdate: (updatedOrderRaw) => {
-      const updatedOrder = mapOrderFromApi(updatedOrderRaw)
+  const handleRealtimeOrderUpdate = useCallback((updatedOrderRaw) => {
+    const updatedOrder = mapOrderFromApi(updatedOrderRaw)
 
-      setOrders((prev) => {
-        const exists = prev.find((o) => o.id === updatedOrder.id)
+    setOrders((prev) => {
+      const exists = prev.find((o) => o.id === updatedOrder.id)
 
-        if (exists) {
-          return prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
-        }
+      if (exists) {
+        return prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+      }
 
-        return [updatedOrder, ...prev]
-      })
-    },
-    enabled: true,
-  })
+      return [updatedOrder, ...prev]
+    })
+  }, [])
+
+  const { isConnected } = useWebSocket(
+    'kitchen:orders',
+    handleRealtimeOrderUpdate,
+    true
+  )
 
   const isReconnecting = !isConnected && wasConnectedOnce
 

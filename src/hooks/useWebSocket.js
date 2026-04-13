@@ -1,54 +1,57 @@
 /**
  * useWebSocket.js
  * ───────────────
- * React hook that subscribes to real-time order updates via WebSocket.
- *
- * - Connects the STOMP client on mount (with JWT from localStorage)
- * - Calls onOrderUpdate(order) whenever an order status changes on the backend
- * - Disconnects cleanly on unmount
+ * Lightweight React hook for subscribing to websocket events.
  *
  * Usage:
- *   const { isConnected } = useWebSocket({
- *     onOrderUpdate: (order) => setOrders(prev => prev.map(o => o.id === order.id ? order : o))
+ *   useWebSocket('user:orders', (order) => {
+ *     setOrders((prev) => prev.map((o) => (o.id === order.id ? order : o)))
+ *   })
+ *
+ *   const { isConnected, lastUpdate } = useWebSocket('admin:orders', (order) => {
+ *     refetchOrders()
  *   })
  */
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { websocketService } from '@/services/websocketService'
 
-export function useWebSocket({ onOrderUpdate, enabled = true } = {}) {
-  const [isConnected, setIsConnected]  = useState(false)
-  const [lastUpdate,  setLastUpdate]   = useState(null)
-  const callbackRef = useRef(onOrderUpdate)
-  callbackRef.current = onOrderUpdate  // keep ref current without re-subscribing
+export function useWebSocket(eventName, handler, enabled = true) {
+  const [isConnected, setIsConnected] = useState(websocketService.isConnected)
+  const [lastUpdate, setLastUpdate] = useState(null)
+  const handlerRef = useRef(handler)
+
+  handlerRef.current = handler
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !eventName) return
 
-    // Connect with current JWT
-    const token = localStorage.getItem('canteen_jwt')
-    websocketService.connect(token)
+    const unsubscribeEvent = websocketService.subscribe(eventName, (payload) => {
+      setLastUpdate({
+        eventName,
+        payload,
+        at: Date.now(),
+      })
 
-    // Poll connection state (STOMP doesn't expose events easily)
-    const pollInterval = setInterval(() => {
-      setIsConnected(websocketService.isConnected)
-    }, 1000)
-
-    // Subscribe to order updates
-    const unsub = websocketService.subscribeToOrders((order) => {
-      setLastUpdate({ order, at: Date.now() })
-      callbackRef.current?.(order)
+      if (typeof handlerRef.current === 'function') {
+        handlerRef.current(payload)
+      }
     })
 
-    // Initial state
+    const unsubscribeConnection = websocketService.subscribe(
+      'connection:change',
+      (value) => {
+        setIsConnected(Boolean(value))
+      }
+    )
+
     setIsConnected(websocketService.isConnected)
 
     return () => {
-      clearInterval(pollInterval)
-      unsub()
-      // Don't disconnect here — service is shared; other components may still be listening
+      unsubscribeEvent?.()
+      unsubscribeConnection?.()
     }
-  }, [enabled])
+  }, [eventName, enabled])
 
   return { isConnected, lastUpdate }
 }

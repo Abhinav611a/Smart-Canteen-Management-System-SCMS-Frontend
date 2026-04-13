@@ -4,6 +4,7 @@ import api from '@/services/api'
 import { useOrders } from '@/hooks/useOrders'
 import { usePagination } from '@/hooks/usePagination'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
   ENDPOINTS,
@@ -59,6 +60,10 @@ export default function AdminOrders() {
   const [actionLoading, setActionLoading] = useState(null)
   const search = useDebounce(rawSearch, 300)
 
+  const { isConnected } = useWebSocket('admin:orders', () => {
+    refetch()
+  })
+
   const filtered = useMemo(() => {
     return orders.filter((o) => {
       const displayStatus = getDisplayStatus(o)
@@ -100,12 +105,12 @@ export default function AdminOrders() {
   const handleApprove = async (order) => {
     try {
       setActionLoading(`approve-${order.id}`)
-
       await api.patch(ENDPOINTS.ADMIN_APPROVE_PAYMENT(order.id))
 
       toast.success(
         `Payment approved for ${order.orderNumber || `#${order.id}`}`
       )
+
       await refetch()
     } catch (e) {
       console.error('Approve failed:', e)
@@ -153,10 +158,18 @@ export default function AdminOrders() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="section-title">All Orders 📦</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {filtered.length} orders{' '}
-            {statusFilter !== 'ALL' ? `(${statusFilter})` : ''}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {filtered.length} orders {statusFilter !== 'ALL' ? `(${statusFilter})` : ''}
+            </p>
+
+            {isConnected && (
+              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                Live updates
+              </span>
+            )}
+          </div>
         </div>
 
         <Button variant="ghost" size="sm" onClick={refetch} icon="🔄">
@@ -169,6 +182,7 @@ export default function AdminOrders() {
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
             🔍
           </span>
+
           <input
             className="input-field pl-10"
             placeholder="Search by ID, name, or tx hash…"
@@ -318,6 +332,7 @@ export default function AdminOrders() {
             <p className="text-xs text-gray-400">
               Page {page} of {totalPages} · {filtered.length} results
             </p>
+
             <Pagination
               page={page}
               totalPages={totalPages}

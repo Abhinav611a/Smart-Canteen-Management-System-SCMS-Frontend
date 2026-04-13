@@ -53,7 +53,9 @@ export const ENDPOINTS = {
   ANALYTICS_CATEGORY_SALES: '/analytics/category-sales',
 
   WS_ENDPOINT: '/ws-orders',
-  WS_TOPIC_ORDERS: '/topic/orders',
+  WS_TOPIC_ADMIN_ORDERS: '/topic/admin/orders',
+  WS_TOPIC_KITCHEN_ORDERS: '/topic/kitchen/orders',
+  WS_TOPIC_USER_PREFIX: '/topic/user',
 }
 
 export const ORDER_STATUS = {
@@ -94,15 +96,15 @@ export const ORDER_STATUS_ICONS = {
 
 export const ROLES = {
   STUDENT: 'student',
-  CHEF: 'chef',
   ADMIN: 'admin',
+  MANAGER: 'manager',
   KITCHEN: 'kitchen',
 }
 
 export const ROLE_HOME = {
   student: '/student/menu',
-  chef: '/chef/orders',
   admin: '/admin/dashboard',
+  manager: '/manager/orders',
   kitchen: '/kitchen/dashboard',
 }
 

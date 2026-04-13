@@ -45,21 +45,26 @@ const NotFound = lazy(() => import('@/pages/NotFound'))
 
 function RequireRole({ role, children }) {
   const { isAuthenticated, user, loading } = useAuth()
-  const userRole = user?.role
+  const userRole = String(user?.role || '').toUpperCase()
+  const requiredRole = String(role || '').toUpperCase()
 
   if (loading) return <PageLoader />
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!userRole) return <Navigate to="/login" replace />
-  if (userRole !== role) return <Navigate to={getRoleHome(userRole)} replace />
+
+  if (userRole !== requiredRole) {
+    return <Navigate to={getRoleHome(userRole)} replace />
+  }
 
   return children
 }
 
 function PublicOnly({ children }) {
   const { isAuthenticated, user, loading } = useAuth()
-  const role = user?.role
+  const role = String(user?.role || '').toUpperCase()
 
   if (loading) return <PageLoader />
+
   if (isAuthenticated && role) {
     return <Navigate to={getRoleHome(role)} replace />
   }
@@ -69,9 +74,10 @@ function PublicOnly({ children }) {
 
 function RootRedirect() {
   const { isAuthenticated, user, loading } = useAuth()
-  const role = user?.role
+  const role = String(user?.role || '').toUpperCase()
 
   if (loading) return <PageLoader />
+
   return (
     <Navigate
       to={isAuthenticated && role ? getRoleHome(role) : '/login'}
