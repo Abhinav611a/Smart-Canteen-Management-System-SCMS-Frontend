@@ -43,7 +43,6 @@ export default function StudentMenu() {
 
   const handleDecrease = (item) => {
     const qty = cartQty(item.id)
-
     if (qty <= 0) return
 
     removeItem(item.id)
@@ -86,7 +85,7 @@ export default function StudentMenu() {
               onClick={() => setCategory(cat)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 category === cat
-                  ? 'bg-brand-500 text-white shadow-glow'
+                  ? 'bg-brand-500 text-white'
                   : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-brand-400'
               }`}
             >
@@ -143,9 +142,10 @@ export default function StudentMenu() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: i * 0.04 }}
-                className={`glass-card relative overflow-hidden p-4 flex flex-col gap-3 group hover:shadow-glow transition-all duration-300 ${
+                className={`glass-card relative isolate overflow-hidden p-4 flex flex-col gap-3 group transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-400/40 ${
                   !item.available ? 'opacity-60' : ''
                 }`}
+                style={{ transform: 'translateZ(0)' }}
               >
                 <div className="relative">
                   <div className="w-full h-28 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl flex items-center justify-center text-5xl group-hover:scale-110 transition-transform duration-300 overflow-hidden">
