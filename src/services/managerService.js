@@ -2,6 +2,17 @@ import api from './api'
 import { ENDPOINTS, ORDER_STATUS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
 
+function unwrapListResponse(raw) {
+  if (Array.isArray(raw)) return raw
+  if (Array.isArray(raw?.data)) return raw.data
+  if (Array.isArray(raw?.data?.data)) return raw.data.data
+  return []
+}
+
+function unwrapItemResponse(raw) {
+  return raw?.data?.data ?? raw?.data ?? raw ?? null
+}
+
 export const managerService = {
   async getMonitor() {
     const query = [
@@ -12,22 +23,17 @@ export const managerService = {
     ].join('&')
 
     const raw = await api.get(`${ENDPOINTS.MANAGER_ORDERS}?${query}`)
-    const list = raw?.data?.data ?? raw?.data ?? raw ?? []
-    return (Array.isArray(list) ? list : []).map(normaliseOrder)
+    return unwrapListResponse(raw).map(normaliseOrder)
   },
 
   async getReady() {
-    const raw = await api.get(
-      `${ENDPOINTS.MANAGER_ORDERS}?status=${encodeURIComponent(ORDER_STATUS.READY)}`
-    )
-
-    const list = raw?.data?.data ?? raw?.data ?? raw ?? []
-    return (Array.isArray(list) ? list : []).map(normaliseOrder)
+    const query = `statuses=${encodeURIComponent(ORDER_STATUS.READY)}`
+    const raw = await api.get(`${ENDPOINTS.MANAGER_ORDERS}?${query}`)
+    return unwrapListResponse(raw).map(normaliseOrder)
   },
 
   async complete(orderId) {
     const raw = await api.patch(ENDPOINTS.MANAGER_ORDER_COMPLETE(orderId))
-    const data = raw?.data?.data ?? raw?.data ?? raw
-    return normaliseOrder(data)
+    return normaliseOrder(unwrapItemResponse(raw))
   },
 }

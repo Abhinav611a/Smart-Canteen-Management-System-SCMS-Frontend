@@ -22,16 +22,27 @@ import Button from '@/components/ui/Button'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
 const TAB_CONFIG = [
-  { key: 'monitor', label: '📡 Monitor', scope: 'monitor', desc: 'All active orders' },
-  { key: 'ready', label: '✅ Ready', scope: 'ready', desc: 'Awaiting pickup' },
+  {
+    key: 'monitor',
+    label: '📡 Monitor',
+    scope: 'monitor',
+    desc: 'All active orders',
+  },
+  {
+    key: 'ready',
+    label: '✅ Ready',
+    scope: 'ready',
+    desc: 'Awaiting pickup',
+  },
 ]
 
 function ElapsedBadge({ seconds, timeStatus }) {
   if (!seconds && seconds !== 0) return null
+
   const mins = Math.floor(seconds / 60)
   const isLate =
-    timeStatus?.toLowerCase().includes('late') ||
-    timeStatus?.toLowerCase().includes('over')
+    String(timeStatus || '').toLowerCase().includes('late') ||
+    String(timeStatus || '').toLowerCase().includes('over')
 
   return (
     <span
@@ -48,10 +59,11 @@ function ElapsedBadge({ seconds, timeStatus }) {
 
 export default function ChefOrders() {
   const [activeTab, setActiveTab] = useState('monitor')
-  const currentScope = TAB_CONFIG.find((t) => t.key === activeTab)?.scope ?? 'monitor'
+  const currentScope =
+    TAB_CONFIG.find((t) => t.key === activeTab)?.scope ?? 'monitor'
 
   const {
-    orders,
+    orders = [],
     loading,
     error,
     refetch,
@@ -63,32 +75,32 @@ export default function ChefOrders() {
   const [completingId, setCompletingId] = useState(null)
 
   const visibleOrders = orders.filter((o) =>
-    [ORDER_STATUS.PENDING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].includes(o.status)
+    [
+      ORDER_STATUS.PAYMENT_PENDING,
+      ORDER_STATUS.PENDING,
+      ORDER_STATUS.PREPARING,
+      ORDER_STATUS.READY,
+    ].includes(o.status)
   )
 
-  const { isConnected } = useWebSocket({
-    onOrderUpdate: useCallback(
+  const { isConnected } = useWebSocket(
+    'manager:orders',
+    useCallback(
       (order) => {
-        const activeStatuses = [
-          ORDER_STATUS.PENDING,
-          ORDER_STATUS.PREPARING,
-          ORDER_STATUS.READY,
-        ]
-
-        if (currentScope === 'ready' && order.status !== ORDER_STATUS.READY) return
-        if (currentScope === 'monitor' && !activeStatuses.includes(order.status)) return
-
         applyRealtimeUpdate(order)
       },
-      [applyRealtimeUpdate, currentScope]
-    ),
-  })
+      [applyRealtimeUpdate]
+    )
+  )
 
   const handleComplete = async (order) => {
     setCompletingId(order.id)
+
     try {
       await completeOrder(order.id)
+
       toast.success(`Order ${order.orderNumber || `#${order.id}`} completed ✓`)
+
       addNotification({
         type: 'complete',
         title: 'Order Completed',
@@ -96,40 +108,52 @@ export default function ChefOrders() {
         icon: '📦',
       })
     } catch (err) {
-      toast.error('Failed to complete order: ' + err.message)
+      toast.error(`Failed to complete order: ${err.message}`)
     } finally {
       setCompletingId(null)
     }
   }
 
-  const pendingCount = visibleOrders.filter((o) => o.status === ORDER_STATUS.PENDING).length
-  const preparingCount = visibleOrders.filter((o) => o.status === ORDER_STATUS.PREPARING).length
-  const readyCount = visibleOrders.filter((o) => o.status === ORDER_STATUS.READY).length
+  const pendingCount = visibleOrders.filter(
+    (o) => o.status === ORDER_STATUS.PENDING
+  ).length
+  const preparingCount = visibleOrders.filter(
+    (o) => o.status === ORDER_STATUS.PREPARING
+  ).length
+  const readyCount = visibleOrders.filter(
+    (o) => o.status === ORDER_STATUS.READY
+  ).length
 
   return (
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="section-title">Manager Dashboard 📊</h2>
+
           <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
             {pendingCount > 0 && (
               <span className="text-amber-600 dark:text-amber-400 font-medium">
                 ⏳ {pendingCount} pending
               </span>
             )}
+
             {preparingCount > 0 && (
               <span className="text-blue-600 dark:text-blue-400 font-medium">
                 👨‍🍳 {preparingCount} cooking
               </span>
             )}
+
             {readyCount > 0 && (
               <span className="text-green-600 dark:text-green-400 font-medium">
                 ✅ {readyCount} ready
               </span>
             )}
+
             <span
               className={`flex items-center gap-1 font-medium ${
-                isConnected ? 'text-green-600 dark:text-green-400' : 'text-gray-400'
+                isConnected
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-gray-400'
               }`}
             >
               <span
@@ -142,7 +166,13 @@ export default function ChefOrders() {
           </div>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={refetch} icon="🔄" disabled={loading}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={refetch}
+          icon="🔄"
+          disabled={loading}
+        >
           Refresh
         </Button>
       </div>
@@ -177,9 +207,13 @@ export default function ChefOrders() {
         </div>
       ) : visibleOrders.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-3">{activeTab === 'ready' ? '✅' : '📡'}</div>
+          <div className="text-5xl mb-3">
+            {activeTab === 'ready' ? '✅' : '📡'}
+          </div>
           <p className="text-gray-500 dark:text-gray-400 font-medium">
-            {activeTab === 'ready' ? 'No orders awaiting pickup' : 'No active orders to monitor'}
+            {activeTab === 'ready'
+              ? 'No orders awaiting pickup'
+              : 'No active orders to monitor'}
           </p>
         </div>
       ) : (
@@ -200,33 +234,50 @@ export default function ChefOrders() {
                       <p className="font-bold text-gray-900 dark:text-white">
                         {order.orderNumber || `#${order.id}`}
                       </p>
+
                       <span
-                        className={`badge ${ORDER_STATUS_COLORS[order.status] ?? 'badge-gray'}`}
+                        className={`badge ${
+                          ORDER_STATUS_COLORS[order.status] ?? 'badge-gray'
+                        }`}
                       >
                         {ORDER_STATUS_ICONS[order.status]}{' '}
-                        {order.statusLabel || ORDER_STATUS_LABELS[order.status] || order.status}
+                        {order.statusLabel ||
+                          ORDER_STATUS_LABELS[order.status] ||
+                          order.status}
                       </span>
                     </div>
+
                     <p className="text-xs text-gray-400 mt-0.5">
                       {order.studentName} · {formatDateTime(order.createdAt)}
                     </p>
                   </div>
-                  <ElapsedBadge seconds={order.elapsedSeconds} timeStatus={order.timeStatus} />
+
+                  <ElapsedBadge
+                    seconds={order.elapsedSeconds}
+                    timeStatus={order.timeStatus}
+                  />
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 mb-3 space-y-1">
-                  {order.items.map((item, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>{MENU_CATEGORY_EMOJIS[item.category] || '🍴'}</span>
-                        <span>{item.name}</span>
-                      </span>
-                      <span className="text-xs text-gray-400">{formatCurrency(item.price)}</span>
-                    </div>
-                  ))}
+                  {Array.isArray(order.items) &&
+                    order.items.map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span>
+                            {MENU_CATEGORY_EMOJIS[item.category] || '🍴'}
+                          </span>
+                          <span>{item.name}</span>
+                        </span>
+
+                        <span className="text-xs text-gray-400">
+                          {formatCurrency(item.price)}
+                        </span>
+                      </div>
+                    ))}
+
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-1.5 flex justify-between text-sm font-bold text-gray-900 dark:text-white">
                     <span>Total</span>
                     <span>{formatCurrency(order.total)}</span>
@@ -234,19 +285,22 @@ export default function ChefOrders() {
                 </div>
 
                 {order.shortDescription && (
-                  <p className="text-xs text-gray-400 italic mb-3">{order.shortDescription}</p>
+                  <p className="text-xs text-gray-400 italic mb-3">
+                    {order.shortDescription}
+                  </p>
                 )}
 
-                {activeTab === 'ready' && order.status === ORDER_STATUS.READY && (
-                  <Button
-                    className="w-full"
-                    onClick={() => handleComplete(order)}
-                    loading={completingId === order.id}
-                    icon="📦"
-                  >
-                    Mark as Completed
-                  </Button>
-                )}
+                {activeTab === 'ready' &&
+                  order.status === ORDER_STATUS.READY && (
+                    <Button
+                      className="w-full"
+                      onClick={() => handleComplete(order)}
+                      loading={completingId === order.id}
+                      icon="📦"
+                    >
+                      Mark as Completed
+                    </Button>
+                  )}
               </motion.div>
             ))}
           </AnimatePresence>
