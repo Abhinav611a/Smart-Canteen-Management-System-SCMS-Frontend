@@ -41,7 +41,7 @@ function cartReducer(state, action) {
           items: state.items.map((item) =>
             item.id === action.item.id
               ? { ...item, qty: nextQty, quantity: nextQty }
-              : item,
+              : item
           ),
         }
       }
@@ -67,7 +67,7 @@ function cartReducer(state, action) {
             : state.items.map((item) =>
                 item.id === action.id
                   ? { ...item, qty: action.qty, quantity: action.qty }
-                  : item,
+                  : item
               ),
       }
 
@@ -181,22 +181,33 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole],
+    [isCartRole]
   )
 
   const removeItem = useCallback(
     async (id) => {
       const current = itemsRef.current.find((item) => item.id === id)
+      const currentQty = current?.qty || current?.quantity || 0
 
+      if (currentQty <= 0) return
+
+      // Local mode: decrease by 1, remove only when qty reaches 0
       if (!cartService.isBackendEnabled() || !isCartRole || !current?.cartItemId) {
-        dispatch({ type: 'REMOVE_LOCAL', id })
+        const newQty = currentQty - 1
+        dispatch({ type: 'UPDATE_LOCAL', id, qty: newQty })
         return
       }
 
       dispatch({ type: 'SET_SYNCING', value: true })
 
       try {
-        const cart = await cartService.removeItem(current)
+        const newQty = currentQty - 1
+
+        const cart =
+          newQty <= 0
+            ? await cartService.removeItem(current)
+            : await cartService.updateItem(current, newQty)
+
         dispatch({ type: 'SET_CART', items: cart?.items ?? [] })
       } catch (error) {
         toast.error(error.message || 'Failed to remove item from cart.')
@@ -205,7 +216,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole],
+    [isCartRole]
   )
 
   const updateQty = useCallback(
@@ -233,7 +244,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole],
+    [isCartRole]
   )
 
   const clearCart = useCallback(async () => {
@@ -244,12 +255,12 @@ export function CartProvider({ children }) {
   const total = state.items.reduce(
     (sum, item) =>
       sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
-    0,
+    0
   )
 
   const count = state.items.reduce(
     (sum, item) => sum + (item.qty || item.quantity || 0),
-    0,
+    0
   )
 
   return (
