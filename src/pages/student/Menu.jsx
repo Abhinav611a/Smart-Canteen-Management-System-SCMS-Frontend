@@ -40,7 +40,11 @@ export default function StudentMenu() {
   )
 
   const cartTotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.qty, 0),
+    () =>
+      cartItems.reduce(
+        (sum, item) => sum + (item.price || 0) * (item.qty || 0),
+        0
+      ),
     [cartItems]
   )
 
@@ -302,7 +306,7 @@ export default function StudentMenu() {
       )}
 
       {cartItemCount > 0 && (
-        <div className="fixed bottom-16 left-0 right-0 z-30 px-4 lg:hidden">
+        <div className="fixed bottom-20 left-0 right-0 z-30 px-4 lg:hidden">
           <Link
             to="/student/cart"
             className="mx-auto flex w-full max-w-md items-center justify-between rounded-3xl bg-emerald-500 px-4 py-3 text-white shadow-lg shadow-emerald-500/25"
