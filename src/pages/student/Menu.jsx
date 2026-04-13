@@ -143,7 +143,7 @@ export default function StudentMenu() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: i * 0.04 }}
-                className={`glass-card p-4 flex flex-col gap-3 group hover:shadow-glow transition-all duration-300 ${
+                className={`glass-card relative overflow-hidden p-4 flex flex-col gap-3 group hover:shadow-glow transition-all duration-300 ${
                   !item.available ? 'opacity-60' : ''
                 }`}
               >
@@ -197,22 +197,24 @@ export default function StudentMenu() {
                 </div>
 
                 {cartQty(item.id) > 0 ? (
-                  <div className="flex items-center justify-between bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-xl px-3 py-2 gap-2">
+                  <div className="relative overflow-hidden flex items-center justify-between bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-xl px-3 py-2 gap-2">
                     <button
+                      type="button"
                       onClick={() => handleDecrease(item)}
-                      className="text-brand-600 dark:text-brand-400 font-bold text-xl leading-none hover:scale-125 transition-transform"
+                      className="relative z-[1] text-brand-600 dark:text-brand-400 font-bold text-xl leading-none hover:scale-125 transition-transform"
                       aria-label={`Decrease quantity of ${item.name}`}
                     >
                       −
                     </button>
 
-                    <span className="text-xs font-semibold text-brand-700 dark:text-brand-400">
+                    <span className="relative z-[1] text-xs font-semibold text-brand-700 dark:text-brand-400">
                       In cart: {cartQty(item.id)}
                     </span>
 
                     <button
+                      type="button"
                       onClick={() => handleAdd(item)}
-                      className="text-brand-600 dark:text-brand-400 font-bold text-xl leading-none hover:scale-125 transition-transform"
+                      className="relative z-[1] text-brand-600 dark:text-brand-400 font-bold text-xl leading-none hover:scale-125 transition-transform"
                       aria-label={`Increase quantity of ${item.name}`}
                     >
                       +
