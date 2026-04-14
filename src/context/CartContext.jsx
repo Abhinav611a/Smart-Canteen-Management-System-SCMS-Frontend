@@ -109,6 +109,7 @@ export function CartProvider({ children }) {
       const cart = await cartService.getCart()
       const backendItems = cart?.items ?? []
 
+      // Always sync local state to backend state - backend is source of truth
       dispatch({ type: 'SET_CART', items: backendItems })
       persistLocalCart(backendItems)
     } catch (error) {
@@ -125,6 +126,7 @@ export function CartProvider({ children }) {
       const isBackend500 = status === 500
 
       if (isCartMissing || isBackend500) {
+        // Backend says cart is empty - clear all local state
         dispatch({ type: 'SET_CART', items: [] })
         persistLocalCart([])
         return
@@ -180,8 +182,11 @@ export function CartProvider({ children }) {
       dispatch({ type: 'SET_SYNCING', value: true })
 
       try {
-        const cart = await cartService.addItem(item, 1)
-        dispatch({ type: 'SET_CART', items: cart?.items ?? [] })
+        // Add item to backend
+        await cartService.addItem(item, 1)
+        // Refetch cart from backend after mutation to ensure state is in sync
+        const updatedCart = await cartService.getCart()
+        dispatch({ type: 'SET_CART', items: updatedCart?.items ?? [] })
       } catch (error) {
         toast.error(error.message || 'Failed to add item to cart.')
         throw error
@@ -214,12 +219,16 @@ export function CartProvider({ children }) {
       try {
         const newQty = currentQty - 1
 
-        const cart =
-          newQty <= 0
-            ? await cartService.removeItem(current)
-            : await cartService.updateItem(current, newQty)
+        // Make backend request and always refetch to ensure frontend matches backend
+        if (newQty <= 0) {
+          await cartService.removeItem(current)
+        } else {
+          await cartService.updateItem(current, newQty)
+        }
 
-        dispatch({ type: 'SET_CART', items: cart?.items ?? [] })
+        // Refetch cart from backend after mutation to ensure state is in sync
+        const updatedCart = await cartService.getCart()
+        dispatch({ type: 'SET_CART', items: updatedCart?.items ?? [] })
       } catch (error) {
         toast.error(error.message || 'Failed to remove item from cart.')
         throw error
@@ -255,12 +264,16 @@ export function CartProvider({ children }) {
       dispatch({ type: 'SET_SYNCING', value: true })
 
       try {
-        const cart =
-          qty <= 0
-            ? await cartService.removeItem(current)
-            : await cartService.updateItem(current, qty)
+        // Make backend request
+        if (qty <= 0) {
+          await cartService.removeItem(current)
+        } else {
+          await cartService.updateItem(current, qty)
+        }
 
-        dispatch({ type: 'SET_CART', items: cart?.items ?? [] })
+        // Refetch cart from backend after mutation to ensure state is in sync
+        const updatedCart = await cartService.getCart()
+        dispatch({ type: 'SET_CART', items: updatedCart?.items ?? [] })
       } catch (error) {
         toast.error(error.message || 'Failed to update cart.')
         throw error

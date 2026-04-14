@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -24,13 +24,30 @@ export default function StudentCart() {
     orderNoticeDescription,
   } = useCanteen()
 
-  const { items, total, count, updateQty, removeItem, clearCart, syncing } =
+  const { items, total, count, updateQty, removeItem, clearCart, syncing, refreshCart } =
     useCart()
   const { addNotification } = useNotifications()
 
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
+  const [backendSynced, setBackendSynced] = useState(false)
+
+  // Sync cart with backend when page loads to ensure UI matches backend
+  useEffect(() => {
+    const syncOnMount = async () => {
+      try {
+        await refreshCart()
+        setBackendSynced(true)
+      } catch (error) {
+        console.error('Failed to sync cart on page load:', error)
+        toast.error('Failed to sync cart. Some items may be stale.')
+        setBackendSynced(false)
+      }
+    }
+
+    syncOnMount()
+  }, [refreshCart])
 
   const handleDecreaseQty = async (item) => {
     try {
@@ -72,12 +89,28 @@ export default function StudentCart() {
     setPlacing(true)
 
     try {
+      // Always ensure backend cart is in sync before checkout
       const backendCart = await cartService.getCart()
 
+      // Strict validation: both frontend and backend must have items
       if (!backendCart?.items?.length) {
         toast.error(
-          'Your backend cart is empty. Please add items again from the menu.'
+          'Cart is empty on the server. This may be a sync issue. Please refresh and try again.'
         )
+        // Clear stale frontend items if backend is empty
+        await clearCart()
+        return
+      }
+
+      // Verify item counts match to detect sync issues
+      const frontendCount = items.reduce((sum, item) => sum + (item.qty || 0), 0)
+      const backendCount = backendCart.items.reduce((sum, item) => sum + (item.qty || 0), 0)
+
+      if (frontendCount !== backendCount) {
+        toast.error(
+          'Cart items on server do not match the UI. Please refresh your cart.'
+        )
+        // Sync frontend with backend items
         return
       }
 
@@ -120,6 +153,8 @@ export default function StudentCart() {
         toast.error(
           'Cart not found on server. Please add items again from the menu.'
         )
+        // Clear stale items
+        await clearCart()
       } else if (status === 400) {
         toast.error(backendMessage || 'Checkout request is invalid.')
       } else {
@@ -259,13 +294,24 @@ export default function StudentCart() {
           </p>
         </div>
 
-        <button
-          onClick={() => clearCart()}
-          className="text-xs font-medium text-red-400 transition-colors hover:text-red-500"
-          type="button"
-        >
-          Clear all
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => refreshCart()}
+            disabled={syncing}
+            className="rounded-full px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-gray-800"
+            title="Sync cart with server"
+            type="button"
+          >
+            {syncing ? '⟳ Syncing…' : '⟳ Sync'}
+          </button>
+          <button
+            onClick={() => clearCart()}
+            className="text-xs font-medium text-red-400 transition-colors hover:text-red-500"
+            type="button"
+          >
+            Clear all
+          </button>
+        </div>
       </div>
 
       {!isOrderingAllowed && (
@@ -275,6 +321,17 @@ export default function StudentCart() {
           </p>
           <p className="mt-1 text-amber-700 dark:text-amber-300">
             {orderNoticeDescription}
+          </p>
+        </div>
+      )}
+
+      {!backendSynced && items.length > 0 && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm shadow-sm dark:border-red-500/20 dark:bg-red-500/10">
+          <p className="font-semibold text-red-900 dark:text-red-200">
+            Cart Sync Warning
+          </p>
+          <p className="mt-1 text-red-700 dark:text-red-300">
+            Your cart may not be fully synced with the server. Click the {`"`}Sync{`"`} button above to refresh.
           </p>
         </div>
       )}

@@ -324,18 +324,17 @@ export default function ChefOrders() {
                   </p>
                 )}
 
-                {activeTab === 'ready' &&
-                  order.status === ORDER_STATUS.READY && (
-                    <Button
-                      className="w-full"
-                      onClick={() => handleComplete(order)}
-                      loading={completingId === order.id}
-                      disabled={canteen.isClosed}
-                      icon="📦"
-                    >
-                      {canteen.isClosed ? 'Unavailable While Closed' : 'Mark as Completed'}
-                    </Button>
-                  )}
+                {order.status === ORDER_STATUS.READY && (
+                  <Button
+                    className="w-full"
+                    onClick={() => handleComplete(order)}
+                    loading={completingId === order.id}
+                    disabled={canteen.isClosed}
+                    icon="📦"
+                  >
+                    {canteen.isClosed ? 'Unavailable While Closed' : 'Mark as Completed'}
+                  </Button>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>

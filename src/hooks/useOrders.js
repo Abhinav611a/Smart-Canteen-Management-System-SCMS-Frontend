@@ -165,7 +165,7 @@ export function useOrders(scope = 'all') {
 
   const completeOrder = useCallback(async (orderId) => {
     const updated = await managerService.complete(orderId)
-    setOrders((prev) => prev.filter((o) => o.id !== orderId))
+    // Let WebSocket handle the update to prefer backend/WebSocket as source of truth
     return updated
   }, [])
 
