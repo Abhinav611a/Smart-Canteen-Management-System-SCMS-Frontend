@@ -1,11 +1,10 @@
-import React, { useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { AlertTriangle } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useNotifications } from '@/context/NotificationContext'
-import { CANTEEN_STATUS } from '@/services/canteenService'
+import { useCanteen } from '@/context/CanteenContext'
 import { cartService } from '@/services/cartService'
 import { formatCurrency } from '@/utils/helpers'
 
@@ -17,38 +16,13 @@ const PAYMENT_METHODS = [
 
 export default function StudentCart() {
   const navigate = useNavigate()
-
-  const outletContext = useOutletContext() || {}
-
-  const fallbackCanteenStatus = {
-    status: CANTEEN_STATUS.CLOSED,
-    closingSoonUntil: null,
-    kitchenReady: false,
-    managerReady: false,
-    isOpen: false,
-    isOpening: false,
-    isClosing: false,
-    isClosed: true,
-    isOrderingAllowed: false,
-    hasClosingWarning: false,
-    loading: false,
-    error: '',
-    refresh: () => {},
-    remainingMs: 0,
-    countdown: '0:00',
-  }
-
-  const canteenStatus = outletContext.canteenStatus || fallbackCanteenStatus
-
   const {
-    isOpen,
-    isOpening,
-    isClosing,
-    isClosed,
     isOrderingAllowed,
-    hasClosingWarning,
-    countdown,
-  } = canteenStatus
+    orderBlockedMessage,
+    checkoutActionLabel,
+    orderNoticeTitle,
+    orderNoticeDescription,
+  } = useCanteen()
 
   const { items, total, count, updateQty, removeItem, clearCart, syncing } =
     useCart()
@@ -58,9 +32,35 @@ export default function StudentCart() {
   const [placed, setPlaced] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
 
+  const handleDecreaseQty = async (item) => {
+    try {
+      await updateQty(item.id, item.qty - 1)
+    } catch {
+      // CartContext already shows the failure toast.
+    }
+  }
+
+  const handleIncreaseQty = async (item) => {
+    try {
+      await updateQty(item.id, item.qty + 1)
+    } catch {
+      // CartContext already shows the failure toast.
+    }
+  }
+
+  const handleRemoveItem = async (item) => {
+    try {
+      await removeItem(item.id)
+    } catch {
+      // CartContext already shows the failure toast.
+    }
+  }
+
   const handlePlaceOrder = async () => {
     if (!isOrderingAllowed) {
-      toast.error('Canteen is not accepting new orders right now.')
+      toast.error(
+        orderBlockedMessage || 'Canteen is not accepting new orders right now.'
+      )
       return
     }
 
@@ -249,52 +249,6 @@ export default function StudentCart() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      {isOpening && (
-        <div className="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Ordering not open yet</p>
-            <p className="mt-1 text-xs">
-              The canteen is still opening. Checkout is disabled for now.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isClosing && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Checkout is unavailable</p>
-            <p className="mt-1 text-xs">
-              The canteen is closing and not accepting new orders.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isClosed && (
-        <div className="flex items-start gap-3 rounded-2xl border border-slate-300 bg-slate-100 px-4 py-3 text-slate-700 dark:border-gray-700 dark:bg-gray-900 dark:text-slate-300">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Canteen is closed</p>
-            <p className="mt-1 text-xs">
-              New orders cannot be placed right now.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isOpen && hasClosingWarning && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-          <p className="text-sm font-semibold">Place your order soon</p>
-          <p className="mt-1 text-xs">
-            Orders are still open. Closing in{' '}
-            <span className="font-bold">{countdown}</span>.
-          </p>
-        </div>
-      )}
-
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -313,6 +267,17 @@ export default function StudentCart() {
           Clear all
         </button>
       </div>
+
+      {!isOrderingAllowed && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10">
+          <p className="font-semibold text-amber-900 dark:text-amber-200">
+            {orderNoticeTitle}
+          </p>
+          <p className="mt-1 text-amber-700 dark:text-amber-300">
+            {orderNoticeDescription}
+          </p>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <AnimatePresence>
@@ -339,7 +304,7 @@ export default function StudentCart() {
 
               <div className="flex shrink-0 items-center gap-2">
                 <button
-                  onClick={() => updateQty(item.id, item.qty - 1)}
+                  onClick={() => handleDecreaseQty(item)}
                   type="button"
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 dark:bg-gray-800"
                 >
@@ -351,9 +316,10 @@ export default function StudentCart() {
                 </span>
 
                 <button
-                  onClick={() => updateQty(item.id, item.qty + 1)}
+                  onClick={() => handleIncreaseQty(item)}
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 dark:bg-gray-800"
+                  disabled={!isOrderingAllowed}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800"
                 >
                   +
                 </button>
@@ -364,7 +330,7 @@ export default function StudentCart() {
               </p>
 
               <button
-                onClick={() => removeItem(item.id)}
+                onClick={() => handleRemoveItem(item)}
                 type="button"
                 className="ml-1 shrink-0 text-sm text-slate-300 transition-colors hover:text-red-500 dark:text-gray-600"
                 title="Remove item"
@@ -437,7 +403,7 @@ export default function StudentCart() {
           className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {!isOrderingAllowed
-            ? 'Ordering Unavailable'
+            ? checkoutActionLabel
             : placing
               ? 'Placing Order…'
               : `Place Order (${paymentMethod})`}

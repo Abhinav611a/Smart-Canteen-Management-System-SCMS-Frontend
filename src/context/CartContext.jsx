@@ -1,4 +1,5 @@
-import React, {
+/* eslint-disable react-refresh/only-export-components */
+import {
   createContext,
   useContext,
   useReducer,
@@ -9,6 +10,7 @@ import React, {
 import toast from 'react-hot-toast'
 import { LS_KEYS } from '@/utils/constants'
 import { useAuth } from '@/context/AuthContext'
+import { useCanteen } from '@/context/CanteenContext'
 import { cartService } from '@/services/cartService'
 
 const CartContext = createContext(null)
@@ -81,6 +83,7 @@ function cartReducer(state, action) {
 
 export function CartProvider({ children }) {
   const { isAuthenticated, user } = useAuth()
+  const { isOrderingAllowed, orderBlockedMessage } = useCanteen()
   const [state, dispatch] = useReducer(cartReducer, initialState)
 
   const role = String(user?.role || '').trim().toUpperCase()
@@ -164,6 +167,11 @@ export function CartProvider({ children }) {
 
   const addItem = useCallback(
     async (item) => {
+      if (!isOrderingAllowed) {
+        toast.error(orderBlockedMessage || 'Canteen is not accepting new orders right now.')
+        return
+      }
+
       if (!cartService.isBackendEnabled() || !isCartRole) {
         dispatch({ type: 'ADD_LOCAL', item })
         return
@@ -181,7 +189,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole]
+    [isCartRole, isOrderingAllowed, orderBlockedMessage]
   )
 
   const removeItem = useCallback(
@@ -191,8 +199,11 @@ export function CartProvider({ children }) {
 
       if (currentQty <= 0) return
 
-      // Local mode: decrease by 1, remove only when qty reaches 0
-      if (!cartService.isBackendEnabled() || !isCartRole || !current?.cartItemId) {
+      if (
+        !cartService.isBackendEnabled() ||
+        !isCartRole ||
+        !current?.cartItemId
+      ) {
         const newQty = currentQty - 1
         dispatch({ type: 'UPDATE_LOCAL', id, qty: newQty })
         return
@@ -222,8 +233,21 @@ export function CartProvider({ children }) {
   const updateQty = useCallback(
     async (id, qty) => {
       const current = itemsRef.current.find((item) => item.id === id)
+      if (!current) return
 
-      if (!cartService.isBackendEnabled() || !isCartRole || !current?.cartItemId) {
+      const currentQty = current?.qty || current?.quantity || 0
+      const isIncrease = qty > currentQty
+
+      if (isIncrease && !isOrderingAllowed) {
+        toast.error(orderBlockedMessage || 'Canteen is not accepting new orders right now.')
+        return
+      }
+
+      if (
+        !cartService.isBackendEnabled() ||
+        !isCartRole ||
+        !current?.cartItemId
+      ) {
         dispatch({ type: 'UPDATE_LOCAL', id, qty })
         return
       }
@@ -244,7 +268,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole]
+    [isCartRole, isOrderingAllowed, orderBlockedMessage]
   )
 
   const clearCart = useCallback(async () => {

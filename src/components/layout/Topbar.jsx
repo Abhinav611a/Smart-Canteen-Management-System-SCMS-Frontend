@@ -22,12 +22,13 @@ export default function Topbar({ onMenuClick, title }) {
   }, [])
 
   return (
-    <header className="h-16 sticky top-0 z-30 flex items-center justify-between border-b border-gray-100 bg-white/80 px-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-950/80 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-100 bg-white/80 px-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-950/80 sm:px-6">
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
           className="btn-ghost p-2 lg:hidden"
           aria-label="Toggle sidebar"
+          type="button"
         >
           <svg
             className="h-5 w-5"
@@ -52,13 +53,17 @@ export default function Topbar({ onMenuClick, title }) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {user?.role === 'ADMIN' && <CanteenToggle />}
+        {String(user?.role || '').toUpperCase() === 'ADMIN' && (
+          <CanteenToggle />
+        )}
+
         <NotificationBell />
         <ThemeToggle />
 
         <div className="relative" ref={ref}>
           <button
             onClick={() => setDropOpen((prev) => !prev)}
+            type="button"
             className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-500 text-xs font-bold text-white">
@@ -79,11 +84,14 @@ export default function Topbar({ onMenuClick, title }) {
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {user?.name}
                 </p>
-                <p className="truncate text-xs text-gray-400">{user?.email}</p>
+                <p className="truncate text-xs text-gray-400">
+                  {user?.email}
+                </p>
               </div>
 
               <button
                 onClick={logout}
+                type="button"
                 className="w-full rounded-lg px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
               >
                 Sign out

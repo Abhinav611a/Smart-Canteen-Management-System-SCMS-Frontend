@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useCanteenStatus } from '@/hooks/useCanteenStatus'
+import CanteenBanner from '@/components/ui/CanteenBanner'
 import { testService } from '@/services/testService'
 import {
   ChefHat,
@@ -16,7 +18,6 @@ import {
   X,
   ListFilter,
 } from 'lucide-react'
-
 import { kitchenService } from '../../services/kitchenService'
 
 const themeMap = {
@@ -37,7 +38,8 @@ const themeMap = {
     secondaryBtn: 'border-slate-700 text-slate-300 hover:bg-slate-800',
     filterWrap: 'bg-slate-900/80 border border-slate-800',
     filterBtn: 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
-    filterBtnActive: 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20',
+    filterBtnActive:
+      'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20',
     emptyCard: 'border border-dashed border-slate-800 bg-slate-900/60',
     errorCard: 'border border-red-500/20 bg-red-500/5',
   },
@@ -58,7 +60,8 @@ const themeMap = {
     secondaryBtn: 'border-slate-300 text-slate-600 hover:bg-slate-100',
     filterWrap: 'bg-white/90 border border-slate-200',
     filterBtn: 'text-slate-500 hover:bg-slate-100 hover:text-slate-800',
-    filterBtnActive: 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20',
+    filterBtnActive:
+      'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20',
     emptyCard: 'border border-dashed border-slate-300 bg-white/80',
     errorCard: 'border border-red-500/20 bg-red-50',
   },
@@ -283,7 +286,9 @@ function FilterTabs({ value, onChange, theme, counts }) {
   ]
 
   return (
-    <div className={`inline-flex items-center gap-2 rounded-2xl p-2 backdrop-blur-md ${t.filterWrap}`}>
+    <div
+      className={`inline-flex items-center gap-2 rounded-2xl p-2 backdrop-blur-md ${t.filterWrap}`}
+    >
       <div className={`flex items-center gap-2 px-2 ${t.subMuted}`}>
         <ListFilter size={15} />
       </div>
@@ -317,15 +322,22 @@ function OrderCard({
   isConnected,
   queuedAction,
   isFlushingQueue,
+  canteenClosed,
 }) {
   const t = themeMap[mode]
   const s = getStatusStyle(order.priority, mode, order.status)
   const actionLabel = getActionLabel(order.status)
-  const disabled = !getNextStatus(order.status) || updating || isFlushingQueue
+  const disabled =
+    !getNextStatus(order.status) ||
+    updating ||
+    isFlushingQueue ||
+    !isConnected ||
+    canteenClosed
   const elapsed = formatElapsedTime(getElapsedSecondsFromPreparing(order, nowTs))
 
   let buttonText = actionLabel
-  if (queuedAction && !isConnected) buttonText = 'Queued Offline'
+  if (canteenClosed) buttonText = 'Unavailable While Closed'
+  else if (queuedAction && !isConnected) buttonText = 'Queued Offline'
   else if (queuedAction && isFlushingQueue) buttonText = 'Syncing...'
   else if (updating) buttonText = 'Updating...'
 
@@ -342,14 +354,18 @@ function OrderCard({
       <div className="flex h-full min-h-[420px] flex-col p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${t.subMuted}`}>
+            <p
+              className={`text-[10px] font-bold uppercase tracking-[0.2em] ${t.subMuted}`}
+            >
               Order Number
             </p>
             <h3 className="text-3xl font-black">{order.orderNumber}</h3>
           </div>
 
           <div className="text-right">
-            <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${t.subMuted}`}>
+            <p
+              className={`text-[10px] font-bold uppercase tracking-[0.2em] ${t.subMuted}`}
+            >
               Elapsed Time
             </p>
             <p className="text-2xl font-black text-emerald-500">{elapsed}</p>
@@ -357,7 +373,9 @@ function OrderCard({
         </div>
 
         <div className="mb-4">
-          <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${t.subMuted}`}>
+          <p
+            className={`text-[10px] font-bold uppercase tracking-[0.2em] ${t.subMuted}`}
+          >
             Current Order Status
           </p>
           <p className={`mt-2 text-3xl font-black uppercase leading-none ${s.statusText}`}>
@@ -424,7 +442,9 @@ function LogoutModal({ open, onClose, onConfirm, theme }) {
   const t = themeMap[theme]
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 ${t.modalOverlay}`}>
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 ${t.modalOverlay}`}
+    >
       <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl ${t.modalCard}`}>
         <div className="mb-4 flex items-start justify-between">
           <div>
@@ -482,6 +502,7 @@ export default function KitchenLayout() {
 
   const { logout } = useAuth()
   const navigate = useNavigate()
+  const canteen = useCanteenStatus(true)
   const t = themeMap[theme]
 
   const fetchKitchenOrders = async (showLoader = true) => {
@@ -595,7 +616,10 @@ export default function KitchenLayout() {
       setIsFlushingQueue(true)
       try {
         for (const action of queuedActions) {
-          const updated = await kitchenService.updateOrderStatus(action.orderId, action.status)
+          const updated = await kitchenService.updateOrderStatus(
+            action.orderId,
+            action.status
+          )
 
           if (updated?.id) {
             setOrders((prev) =>
@@ -631,7 +655,9 @@ export default function KitchenLayout() {
   }, [orders])
 
   const queueCount = useMemo(
-    () => orders.filter((o) => ['PENDING', 'PREPARING', 'READY'].includes(o.status)).length,
+    () =>
+      orders.filter((o) => ['PENDING', 'PREPARING', 'READY'].includes(o.status))
+        .length,
     [orders]
   )
 
@@ -654,6 +680,11 @@ export default function KitchenLayout() {
   }, [queuedActions])
 
   const handlePromoteStatus = async (orderId, currentStatus) => {
+    if (canteen.isClosed) {
+      toast.error('Canteen is closed. Actions are disabled.')
+      return
+    }
+
     const nextStatus = getNextStatus(currentStatus)
     if (!nextStatus) return
 
@@ -736,8 +767,14 @@ export default function KitchenLayout() {
                       isConnected ? 'animate-pulse bg-emerald-500' : 'bg-red-500'
                     }`}
                   />
-                  <span className={`text-xs font-bold uppercase tracking-widest ${t.muted}`}>
-                    {isConnected ? 'Live Feed' : isReconnecting ? 'Reconnecting' : 'Disconnected'}
+                  <span
+                    className={`text-xs font-bold uppercase tracking-widest ${t.muted}`}
+                  >
+                    {isConnected
+                      ? 'Live Feed'
+                      : isReconnecting
+                        ? 'Reconnecting'
+                        : 'Disconnected'}
                   </span>
                 </div>
               </div>
@@ -745,7 +782,9 @@ export default function KitchenLayout() {
 
             <div className="flex items-center gap-3">
               <div className="mr-2 hidden text-right sm:block">
-                <p className={`text-[10px] font-bold uppercase tracking-widest ${t.subMuted}`}>
+                <p
+                  className={`text-[10px] font-bold uppercase tracking-widest ${t.subMuted}`}
+                >
                   Orders in Queue
                 </p>
                 <p className="text-xl font-black">{queueCount}</p>
@@ -755,7 +794,9 @@ export default function KitchenLayout() {
                 <button
                   type="button"
                   className={`relative flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 ${t.topIconBtn} ${
-                    theme === 'dark' ? 'hover:shadow-slate-900/40' : 'hover:shadow-slate-300/60'
+                    theme === 'dark'
+                      ? 'hover:shadow-slate-900/40'
+                      : 'hover:shadow-slate-300/60'
                   }`}
                 >
                   <span className="absolute right-2 top-2 flex h-2.5 w-2.5">
@@ -822,33 +863,9 @@ export default function KitchenLayout() {
           </header>
 
           <section className="flex-1 overflow-y-auto p-6 pb-24 md:p-8 md:pb-24">
-            {!isConnected && (
-              <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-red-500">
-                      {isReconnecting
-                        ? '⚠️ Backend disconnected — reconnecting…'
-                        : '⚠️ Backend disconnected'}
-                    </p>
-                    <p className="mt-1 text-xs text-red-400">
-                      Real-time updates unavailable.
-                      {queuedActions.length > 0
-                        ? ` ${queuedActions.length} action(s) queued offline.`
-                        : ' New actions will be queued and synced on reconnect.'}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => fetchKitchenOrders(true)}
-                    className="rounded-lg border border-red-500 px-3 py-1 text-xs font-bold text-red-500 hover:bg-red-500/10"
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="mb-6">
+              <CanteenBanner />
+            </div>
 
             {error ? (
               <div className={`mb-6 rounded-2xl p-4 ${t.errorCard}`}>
@@ -866,11 +883,18 @@ export default function KitchenLayout() {
             ) : null}
 
             <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <FilterTabs value={filter} onChange={setFilter} theme={theme} counts={counts} />
+              <FilterTabs
+                value={filter}
+                onChange={setFilter}
+                theme={theme}
+                counts={counts}
+              />
 
               <div className="flex items-center gap-4">
                 <div className={`text-sm font-semibold ${t.muted}`}>
-                  Showing <span className="text-emerald-500">{filteredOrders.length}</span> orders
+                  Showing{' '}
+                  <span className="text-emerald-500">{filteredOrders.length}</span>{' '}
+                  orders
                 </div>
 
                 <button
@@ -910,6 +934,7 @@ export default function KitchenLayout() {
                     isConnected={isConnected}
                     queuedAction={queuedActionsMap[order.id]}
                     isFlushingQueue={isFlushingQueue}
+                    canteenClosed={canteen.isClosed}
                   />
                 ))}
               </div>
@@ -922,9 +947,17 @@ export default function KitchenLayout() {
         >
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isConnected ? 'bg-emerald-500' : 'bg-red-500'
+                }`}
+              />
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                {isConnected ? 'Connected' : isReconnecting ? 'Reconnecting' : 'Disconnected'}
+                {isConnected
+                  ? 'Connected'
+                  : isReconnecting
+                    ? 'Reconnecting'
+                    : 'Disconnected'}
               </span>
             </div>
 
@@ -943,7 +976,11 @@ export default function KitchenLayout() {
                 isConnected ? 'text-emerald-500' : 'text-red-500'
               }`}
             >
-              {isConnected ? 'Connected' : isReconnecting ? 'Reconnecting' : 'Disconnected'}
+              {isConnected
+                ? 'Connected'
+                : isReconnecting
+                  ? 'Reconnecting'
+                  : 'Disconnected'}
             </span>
             <RefreshCw
               size={14}

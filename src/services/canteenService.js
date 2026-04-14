@@ -8,6 +8,55 @@ export const CANTEEN_STATUS = {
   CLOSING: 'CLOSING',
 }
 
+function getOrderingCopy(status) {
+  switch (status) {
+    case CANTEEN_STATUS.OPEN:
+      return {
+        statusLabel: 'Open',
+        orderBlockedMessage: '',
+        orderActionLabel: 'Add to Cart',
+        checkoutActionLabel: 'Place Order',
+        orderNoticeTitle: '',
+        orderNoticeDescription: '',
+      }
+
+    case CANTEEN_STATUS.OPENING:
+      return {
+        statusLabel: 'Opening Soon',
+        orderBlockedMessage:
+          'Canteen is opening soon. Please wait for service to begin.',
+        orderActionLabel: 'Opening Soon',
+        checkoutActionLabel: 'Opening Soon',
+        orderNoticeTitle: 'Opening soon',
+        orderNoticeDescription:
+          'Browse the menu while the team prepares service.',
+      }
+
+    case CANTEEN_STATUS.CLOSING:
+      return {
+        statusLabel: 'Closing',
+        orderBlockedMessage:
+          'Not accepting new orders. Completing existing orders...',
+        orderActionLabel: 'Not Accepting New Orders',
+        checkoutActionLabel: 'Not Accepting New Orders',
+        orderNoticeTitle: 'Not accepting new orders',
+        orderNoticeDescription: 'Completing existing orders...',
+      }
+
+    case CANTEEN_STATUS.CLOSED:
+    default:
+      return {
+        statusLabel: 'Closed',
+        orderBlockedMessage: 'Canteen is closed.',
+        orderActionLabel: 'Canteen Closed',
+        checkoutActionLabel: 'Canteen Closed',
+        orderNoticeTitle: 'Canteen is closed',
+        orderNoticeDescription:
+          'Browse the menu and come back when service resumes.',
+      }
+  }
+}
+
 export function normaliseCanteenState(raw) {
   const source = raw ?? {}
 
@@ -24,16 +73,23 @@ export function normaliseCanteenState(raw) {
 }
 
 export function getCanteenView(state) {
+  const isOpen = state.status === CANTEEN_STATUS.OPEN
+  const isOpening = state.status === CANTEEN_STATUS.OPENING
+  const isClosed = state.status === CANTEEN_STATUS.CLOSED
+  const isClosing = state.status === CANTEEN_STATUS.CLOSING
   const isClosingSoon =
-    state.status === CANTEEN_STATUS.OPEN && Boolean(state.closingSoonUntil)
+    isOpen && Boolean(state.closingSoonUntil)
+  const orderingCopy = getOrderingCopy(state.status)
 
   return {
     ...state,
-    canOrder: state.status === CANTEEN_STATUS.OPEN,
-    isOpening: state.status === CANTEEN_STATUS.OPENING,
-    isClosed: state.status === CANTEEN_STATUS.CLOSED,
-    isClosing: state.status === CANTEEN_STATUS.CLOSING,
+    canOrder: isOpen,
+    isOpen,
+    isOpening,
+    isClosed,
+    isClosing,
     isClosingSoon,
+    ...orderingCopy,
   }
 }
 

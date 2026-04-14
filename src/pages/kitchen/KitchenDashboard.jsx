@@ -1,15 +1,16 @@
 /**
  * KitchenDashboard.jsx
  * ────────────────────
- * Manager view: Monitor all active orders + mark ready orders as complete.
+ * Kitchen view: Monitor active kitchen orders + mark ready orders as complete.
  */
 
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useNotifications } from '@/context/NotificationContext'
+import { useCanteen } from '@/context/CanteenContext'
 import {
   ORDER_STATUS,
   ORDER_STATUS_ICONS,
@@ -46,10 +47,10 @@ function ElapsedBadge({ seconds, timeStatus }) {
 
   return (
     <span
-      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
+      className={`rounded-full px-1.5 py-0.5 text-[10px] font-mono font-bold ${
         isLate
-          ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+          ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
       }`}
     >
       ⏱ {mins > 0 ? `${mins}m` : `${seconds}s`}
@@ -57,8 +58,31 @@ function ElapsedBadge({ seconds, timeStatus }) {
   )
 }
 
+function getEmptyStateText(activeTab, canteen) {
+  if (activeTab === 'ready') {
+    if (canteen.isClosed) return 'Canteen is closed. No pickup queue right now.'
+    if (canteen.isOpening) return 'Opening soon. Pickup queue will appear once orders begin.'
+    return 'No orders awaiting pickup'
+  }
+
+  if (canteen.isOpening) {
+    return 'Opening soon. The kitchen can prepare for the first incoming orders.'
+  }
+
+  if (canteen.isClosing) {
+    return 'No active kitchen orders left. Existing work is being wrapped up.'
+  }
+
+  if (canteen.isClosed) {
+    return 'Canteen is closed. Kitchen operations are inactive.'
+  }
+
+  return 'No active kitchen orders to monitor'
+}
+
 export default function KitchenDashboard() {
   const [activeTab, setActiveTab] = useState('monitor')
+  const canteen = useCanteen()
 
   const currentScope =
     TAB_CONFIG.find((t) => t.key === activeTab)?.scope ?? 'monitor'
@@ -82,7 +106,7 @@ export default function KitchenDashboard() {
   )
 
   const { isConnected } = useWebSocket(
-    'manager:orders',
+    'kitchen:orders',
     useCallback(
       (order) => {
         const activeStatuses = [
@@ -109,6 +133,11 @@ export default function KitchenDashboard() {
   )
 
   const handleComplete = async (order) => {
+    if (canteen.isClosed) {
+      toast.error('Canteen is closed. Completion actions are disabled.')
+      return
+    }
+
     setCompletingId(order.id)
 
     try {
@@ -140,26 +169,26 @@ export default function KitchenDashboard() {
   ).length
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="flex items-start justify-between flex-wrap gap-3">
+    <div className="animate-fade-in space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="section-title">Manager Dashboard 📊</h2>
+          <h2 className="section-title">Kitchen Dashboard 👨‍🍳</h2>
 
-          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
             {pendingCount > 0 && (
-              <span className="text-amber-600 dark:text-amber-400 font-medium">
+              <span className="font-medium text-amber-600 dark:text-amber-400">
                 ⏳ {pendingCount} pending
               </span>
             )}
 
             {preparingCount > 0 && (
-              <span className="text-blue-600 dark:text-blue-400 font-medium">
+              <span className="font-medium text-blue-600 dark:text-blue-400">
                 👨‍🍳 {preparingCount} cooking
               </span>
             )}
 
             {readyCount > 0 && (
-              <span className="text-green-600 dark:text-green-400 font-medium">
+              <span className="font-medium text-green-600 dark:text-green-400">
                 ✅ {readyCount} ready
               </span>
             )}
@@ -172,13 +201,24 @@ export default function KitchenDashboard() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                className={`h-1.5 w-1.5 rounded-full ${
+                  isConnected ? 'animate-pulse bg-green-500' : 'bg-gray-400'
                 }`}
               />
               {isConnected ? 'Live' : 'Offline'}
             </span>
           </div>
+
+          {(canteen.isOpening || canteen.isClosing || canteen.isClosed) && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {canteen.isOpening &&
+                'Opening soon — kitchen can prepare before new orders begin.'}
+              {canteen.isClosing &&
+                'No new orders are expected. Finish the remaining queue.'}
+              {canteen.isClosed &&
+                'Canteen closed — kitchen action flow is limited.'}
+            </p>
+          )}
         </div>
 
         <Button
@@ -192,15 +232,15 @@ export default function KitchenDashboard() {
         </Button>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
+      <div className="w-fit rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
         {TAB_CONFIG.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               activeTab === t.key
-                ? 'bg-white dark:bg-gray-900 shadow text-gray-900 dark:text-white'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                ? 'bg-white text-gray-900 shadow dark:bg-gray-900 dark:text-white'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
             {t.label}
@@ -209,30 +249,28 @@ export default function KitchenDashboard() {
       </div>
 
       {error && (
-        <div className="glass-card p-4 text-sm text-red-500 border border-red-200 dark:border-red-900">
+        <div className="glass-card border border-red-200 p-4 text-sm text-red-500 dark:border-red-900">
           ⚠️ {error}
         </div>
       )}
 
       {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonCard key={i} lines={4} />
           ))}
         </div>
       ) : visibleOrders.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="text-5xl mb-3">
+        <div className="py-20 text-center">
+          <div className="mb-3 text-5xl">
             {activeTab === 'ready' ? '✅' : '📡'}
           </div>
-          <p className="text-gray-500 dark:text-gray-400 font-medium">
-            {activeTab === 'ready'
-              ? 'No orders awaiting pickup'
-              : 'No active orders to monitor'}
+          <p className="font-medium text-gray-500 dark:text-gray-400">
+            {getEmptyStateText(activeTab, canteen)}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <AnimatePresence mode="popLayout">
             {visibleOrders.map((order) => (
               <motion.div
@@ -243,9 +281,9 @@ export default function KitchenDashboard() {
                 exit={{ opacity: 0, scale: 0.97 }}
                 className="glass-card p-5"
               >
-                <div className="flex items-start justify-between mb-3">
+                <div className="mb-3 flex items-start justify-between">
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-gray-900 dark:text-white">
                         {order.orderNumber || `#${order.id}`}
                       </p>
@@ -262,7 +300,7 @@ export default function KitchenDashboard() {
                       </span>
                     </div>
 
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="mt-0.5 text-xs text-gray-400">
                       {order.studentName} · {formatDateTime(order.createdAt)}
                     </p>
                   </div>
@@ -273,7 +311,7 @@ export default function KitchenDashboard() {
                   />
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 mb-3 space-y-1">
+                <div className="mb-3 space-y-1 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
                   {order.items.map((item, i) => (
                     <div
                       key={i}
@@ -290,14 +328,14 @@ export default function KitchenDashboard() {
                     </div>
                   ))}
 
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-1.5 flex justify-between text-sm font-bold text-gray-900 dark:text-white">
+                  <div className="flex justify-between border-t border-gray-200 pt-1.5 text-sm font-bold text-gray-900 dark:border-gray-700 dark:text-white">
                     <span>Total</span>
                     <span>{formatCurrency(order.total)}</span>
                   </div>
                 </div>
 
                 {order.shortDescription && (
-                  <p className="text-xs text-gray-400 italic mb-3">
+                  <p className="mb-3 text-xs italic text-gray-400">
                     {order.shortDescription}
                   </p>
                 )}
@@ -308,9 +346,10 @@ export default function KitchenDashboard() {
                       className="w-full"
                       onClick={() => handleComplete(order)}
                       loading={completingId === order.id}
+                      disabled={canteen.isClosed}
                       icon="📦"
                     >
-                      Mark as Completed
+                      {canteen.isClosed ? 'Unavailable While Closed' : 'Mark as Completed'}
                     </Button>
                   )}
               </motion.div>

@@ -1,5 +1,6 @@
 // BlockchainContext — blockchain removed. Stub keeps App.jsx imports working.
-import React, { createContext, useContext } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext } from 'react'
 const BlockchainContext = createContext({
   account: null, chainId: null, isConnected: false,
   isConnecting: false, balance: '0', signer: null,

@@ -1,7 +1,6 @@
-import React from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { formatCurrency } from '@/utils/helpers'
 import { CHART_COLORS } from '@/utils/constants'

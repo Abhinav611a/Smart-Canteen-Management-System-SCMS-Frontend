@@ -1,5 +1,3 @@
-import React from 'react'
-
 const VARIANTS = {
   green:  'badge-green',
   yellow: 'badge-yellow',

@@ -2,7 +2,7 @@
  * Profile.jsx — Student profile with real order stats from backend.
  * Blockchain/wallet section removed.
  */
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'

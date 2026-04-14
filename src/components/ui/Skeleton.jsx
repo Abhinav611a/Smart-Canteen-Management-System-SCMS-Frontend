@@ -1,5 +1,3 @@
-import React from 'react'
-
 export function SkeletonCard({ lines = 3 }) {
   return (
     <div className="glass-card p-5 flex flex-col gap-3 animate-pulse">

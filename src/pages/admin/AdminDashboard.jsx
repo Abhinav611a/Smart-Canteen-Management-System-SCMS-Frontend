@@ -7,11 +7,9 @@
  *            for revenue KPIs to avoid duplicate API calls with AdminOrders page.
  */
 
-import React from 'react'
 import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useAnalytics } from '@/hooks/useAnalytics'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import { formatCurrency } from '@/utils/helpers'
 import StatCard from '@/components/ui/StatCard'
 import RevenueAreaChart from '@/components/charts/RevenueAreaChart'

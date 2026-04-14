@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Bell,
@@ -8,9 +8,6 @@ import {
   User,
   Moon,
   Sun,
-  Clock3,
-  Store,
-  AlertTriangle,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Sidebar from './Sidebar'
@@ -19,7 +16,7 @@ import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useCanteenStatus } from '@/hooks/useCanteenStatus'
-import { CANTEEN_STATUS } from '@/services/canteenService'
+import CanteenBanner from '@/components/ui/CanteenBanner'
 
 function getPageTitle(pathname) {
   if (pathname.includes('/student/orders')) return 'My Orders'
@@ -91,95 +88,6 @@ function ThemeToggleButton() {
   )
 }
 
-function CanteenStatusBanner({ canteenStatus }) {
-  const {
-    status,
-    isOpening,
-    isClosingSoon,
-    isClosing,
-    isClosed,
-    countdown,
-    loading,
-  } = canteenStatus
-
-  if (loading) return null
-
-  if (isOpening) {
-    return (
-      <div className="border-b border-sky-200 bg-sky-50 px-4 py-3 text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
-        <div className="mx-auto flex w-full max-w-md items-start gap-3">
-          <div className="mt-0.5 rounded-full bg-sky-100 p-2 dark:bg-sky-500/15">
-            <Store size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Canteen is opening soon</p>
-            <p className="mt-0.5 text-xs">
-              The team is getting ready. Ordering will open shortly.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (status === CANTEEN_STATUS.OPEN && isClosingSoon) {
-    return (
-      <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-        <div className="mx-auto flex w-full max-w-md items-start gap-3">
-          <div className="mt-0.5 rounded-full bg-amber-100 p-2 dark:bg-amber-500/15">
-            <Clock3 size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Canteen is closing soon</p>
-            <p className="mt-0.5 text-xs">
-              Place your order soon. Ordering closes in{' '}
-              <span className="font-bold">{countdown}</span>.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (isClosing) {
-    return (
-      <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-red-900 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
-        <div className="mx-auto flex w-full max-w-md items-start gap-3">
-          <div className="mt-0.5 rounded-full bg-red-100 p-2 dark:bg-red-500/15">
-            <AlertTriangle size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Not accepting new orders</p>
-            <p className="mt-0.5 text-xs">
-              The canteen is closing. Existing orders will continue.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (isClosed) {
-    return (
-      <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-red-900 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
-        <div className="mx-auto flex w-full max-w-md items-start gap-3">
-          <div className="mt-0.5 rounded-full bg-red-100 p-2 dark:bg-red-500/15">
-            <Store size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Canteen is closed</p>
-            <p className="mt-0.5 text-xs">
-              New orders are currently unavailable.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return null
-}
-
 export default function StudentLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { count } = useCart()
@@ -238,12 +146,13 @@ export default function StudentLayout() {
               </NavLink>
             </div>
           </div>
-
-          <CanteenStatusBanner canteenStatus={canteenStatus} />
         </header>
 
         <main className="flex-1 px-4 pb-24 pt-4">
-          <Outlet context={{ canteenStatus }} />
+          <div className="space-y-4">
+            <CanteenBanner />
+            <Outlet context={{ canteenStatus }} />
+          </div>
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
@@ -278,7 +187,10 @@ export default function StudentLayout() {
         <div className="flex flex-1 flex-col overflow-hidden lg:ml-0">
           <Topbar onMenuClick={() => setSidebarOpen(true)} />
           <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-            <Outlet context={{ canteenStatus }} />
+            <div className="space-y-6">
+              <CanteenBanner />
+              <Outlet context={{ canteenStatus }} />
+            </div>
           </main>
         </div>
       </div>

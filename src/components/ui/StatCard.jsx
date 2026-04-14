@@ -1,5 +1,3 @@
-import React from 'react'
-
 export default function StatCard({ icon, label, value, sub, trend, color = 'green' }) {
   const colors = {
     green:  'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',

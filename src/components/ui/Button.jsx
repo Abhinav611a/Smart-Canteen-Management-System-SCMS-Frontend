@@ -1,5 +1,3 @@
-import React from 'react'
-
 const variants = {
   primary: 'btn-primary',
   secondary: 'btn-secondary',

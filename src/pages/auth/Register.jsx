@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -83,7 +83,6 @@ export default function Register() {
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
   })
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
@@ -164,8 +163,8 @@ export default function Register() {
     if (!form.password || form.password.length < 6) {
       e.password = 'Password must be at least 6 characters'
     }
-    if (form.password !== form.confirmPassword) {
-      e.confirmPassword = 'Passwords do not match'
+    if (form.password && form.password.length >= 6) {
+      // confirmPassword validation is handled inline only
     }
 
     setErrors(e)
@@ -271,15 +270,16 @@ export default function Register() {
     setLoading(true)
 
     try {
-      const { confirmPassword, ...data } = form
+      // Send only email, name, password (confirmPassword is handled via input field for UX)
+      const { name, email, password } = form
 
       await register({
-        ...data,
-        email: data.email.trim(),
-        name: data.name.trim(),
+        email: email.trim(),
+        name: name.trim(),
+        password,
       })
 
-      const cleanEmail = data.email.trim()
+      const cleanEmail = email.trim()
 
       goToOtpStep(cleanEmail)
       setCooldown(RESEND_COOLDOWN)

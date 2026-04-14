@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 
 const NotificationContext = createContext(null)

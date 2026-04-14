@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import {
   Search,
@@ -627,7 +627,7 @@ export default function AdminUsers() {
       >
         <div className="space-y-3">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Update the selected user's role.
+            Update the selected user&apos;s role.
           </p>
 
           <div className="rounded-2xl border border-gray-200/70 bg-gray-50/70 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">

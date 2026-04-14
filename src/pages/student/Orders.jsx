@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, ChevronDown, ChevronUp, Clock3 } from 'lucide-react'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useCanteen } from '@/context/CanteenContext'
 import { ordersService } from '@/services/orders'
 import {
   ORDER_STATUS,
@@ -151,6 +152,7 @@ function AnimatedDetail({ open, children }) {
 export default function StudentOrders() {
   const { orders, loading, error, refetch, applyRealtimeUpdate } =
     useOrders('my')
+  const { isOrderingAllowed, orderBlockedMessage } = useCanteen()
 
   const [expandedId, setExpandedId] = useState(null)
   const [reorderingId, setReorderingId] = useState(null)
@@ -187,6 +189,13 @@ export default function StudentOrders() {
   )
 
   const handleReorder = async (order) => {
+    if (!isOrderingAllowed) {
+      toast.error(
+        orderBlockedMessage || 'Canteen is not accepting new orders right now.'
+      )
+      return
+    }
+
     setReorderingId(order.id)
 
     try {
@@ -422,11 +431,15 @@ export default function StudentOrders() {
                     {order.canReorder && (
                       <button
                         type="button"
-                        disabled={reorderingId === order.id}
+                        disabled={reorderingId === order.id || !isOrderingAllowed}
                         onClick={() => handleReorder(order)}
                         className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-800 dark:text-slate-200 dark:hover:bg-gray-700"
                       >
-                        {reorderingId === order.id ? 'Reordering...' : 'Reorder'}
+                        {reorderingId === order.id
+                          ? 'Reordering...'
+                          : !isOrderingAllowed
+                            ? 'Reorder Unavailable'
+                            : 'Reorder'}
                       </button>
                     )}
 
