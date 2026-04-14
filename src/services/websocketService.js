@@ -1,6 +1,7 @@
 import { Client } from '@stomp/stompjs'
 import { BACKEND_URL, ENDPOINTS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
+import { normaliseCanteenState, getCanteenView } from './canteenService'
 
 let client = null
 let connected = false
@@ -22,6 +23,16 @@ function parseOrderMessage(message) {
     return normaliseOrder(raw)
   } catch (error) {
     console.warn('[WS] Failed to parse order payload:', message.body, error)
+    return null
+  }
+}
+
+function parseCanteenMessage(message) {
+  try {
+    const raw = JSON.parse(message.body)
+    return getCanteenView(normaliseCanteenState(raw))
+  } catch (error) {
+    console.warn('[WS] Failed to parse canteen payload:', message.body, error)
     return null
   }
 }
@@ -109,6 +120,11 @@ function getRoleTopics(user) {
     })
   }
 
+  topics.push({
+    topic: ENDPOINTS.WS_TOPIC_CANTEEN_STATUS,
+    eventName: 'canteen:status',
+  })
+
   return topics
 }
 
@@ -137,10 +153,17 @@ function subscribeToTopic(topic, eventName) {
   const subscription = client.subscribe(topic, (message) => {
     console.log('[WS] Message received from:', topic, message.body)
 
-    const order = parseOrderMessage(message)
-    if (!order) return
+    let payload = null
 
-    emit(eventName, order)
+    if (eventName === 'canteen:status') {
+      payload = parseCanteenMessage(message)
+    } else {
+      payload = parseOrderMessage(message)
+    }
+
+    if (!payload) return
+
+    emit(eventName, payload)
   })
 
   topicSubscriptions.set(key, {
@@ -203,9 +226,15 @@ async function buildClient(token) {
       connectionAttempted = true
       connectionInProgress = false
 
-      clearSubscriptions()
-      applyRoleSubscriptions(activeUser)
       emit('connection:change', true)
+
+      // Delay subscriptions slightly to avoid STOMP race condition
+      window.setTimeout(() => {
+        if (!client || !client.connected) return
+
+        clearSubscriptions()
+        applyRoleSubscriptions(activeUser)
+      }, 50)
     },
 
     onDisconnect: () => {
@@ -254,7 +283,8 @@ export const websocketService = {
 
     const sameUser =
       activeToken === token &&
-      String(activeUser?.id || '') === String(user?.id || '')
+      String(activeUser?.id || '') === String(user?.id || '') &&
+      String(activeUser?.role || '') === String(user?.role || '')
 
     if (connected && sameUser) {
       console.log('[WS] Already connected for same user')

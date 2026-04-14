@@ -4,72 +4,47 @@ import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { ENDPOINTS } from '@/utils/constants'
 import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/hooks/useWebSocket'
+import { CANTEEN_STATUS } from '@/services/canteenService'
 
 export default function CanteenToggle() {
   const { user } = useAuth()
-  const [isOpen, setIsOpen] = useState(false)
+
+  const [status, setStatus] = useState(CANTEEN_STATUS.CLOSED)
   const [loading, setLoading] = useState(false)
-  const [initialized, setInitialized] = useState(false)
+  const [initialized, setInitialized] = useState(true)
 
   const isAdmin = user?.role === 'ADMIN'
+  const isOpen = status === CANTEEN_STATUS.OPEN
+
+  const { isConnected } = useWebSocket(
+    'canteen:status',
+    (payload) => {
+      setStatus(payload.status)
+      setInitialized(true)
+    },
+    isAdmin
+  )
 
   useEffect(() => {
     if (!isAdmin) return
 
-    let mounted = true
-
-    const fetchStatus = async () => {
-      setLoading(true)
-
-      try {
-        const res = await api.get(ENDPOINTS.CANTEEN_STATUS)
-
-        if (typeof res !== 'boolean') {
-          throw new Error('Invalid canteen status response')
-        }
-
-        if (mounted) {
-          setIsOpen(res)
-        }
-      } catch (error) {
-        console.warn('Failed to fetch canteen status.', error)
-
-        toast('Unable to fetch canteen status.', {
-          icon: '⚠️',
-          id: 'canteen-status-warning',
-        })
-
-        if (mounted) {
-          setIsOpen(false)
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-          setInitialized(true)
-        }
-      }
+    if (isConnected) {
+      setInitialized(true)
     }
-
-    fetchStatus()
-
-    return () => {
-      mounted = false
-    }
-  }, [isAdmin])
+  }, [isAdmin, isConnected])
 
   const handleToggle = async () => {
-    if (!isAdmin || loading || !initialized) return
+    if (!isAdmin || loading) return
 
     setLoading(true)
 
     try {
       if (isOpen) {
-        await api.post(ENDPOINTS.CANTEEN_CLOSE)
-        setIsOpen(false)
-        toast.success('Canteen closed successfully')
+        await api.post(ENDPOINTS.CANTEEN_CLOSING)
+        toast.success('Stopping new orders')
       } else {
         await api.post(ENDPOINTS.CANTEEN_OPEN)
-        setIsOpen(true)
         toast.success('Canteen opened successfully')
       }
     } catch (error) {
@@ -114,20 +89,15 @@ export default function CanteenToggle() {
       <button
         type="button"
         onClick={handleToggle}
-        disabled={loading || !initialized}
-        aria-label={isOpen ? 'Close canteen' : 'Open canteen'}
-        className={`relative h-8 w-16 rounded-full transition-all duration-300 ease-out ${
+        disabled={loading}
+        className={`relative h-8 w-16 rounded-full transition-all duration-300 ${
           isOpen
             ? 'bg-emerald-500 shadow-[0_8px_24px_rgba(16,185,129,0.35)]'
             : 'bg-gray-300 dark:bg-gray-700'
-        } ${
-          loading || !initialized
-            ? 'cursor-not-allowed opacity-80'
-            : 'cursor-pointer'
-        }`}
+        } ${loading ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
       >
         <span
-          className={`absolute top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-md transition-all duration-300 ease-out ${
+          className={`absolute top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-md transition-all duration-300 ${
             isOpen ? 'left-9' : 'left-1'
           }`}
         >

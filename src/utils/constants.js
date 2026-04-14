@@ -20,9 +20,12 @@ export const ENDPOINTS = {
   ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_APPROVE_PAYMENT: (id) => `/admin/orders/${id}/approve-payment`,
 
+  CANTEEN: '/canteen',
+  CANTEEN_OPENING: '/admin/canteen/opening',
   CANTEEN_OPEN: '/admin/canteen/open',
-  CANTEEN_CLOSE: '/admin/canteen/close',
-  CANTEEN_STATUS: '/admin/canteen/status',
+  CANTEEN_CLOSING_SOON: '/admin/canteen/closing-soon',
+  CANTEEN_CLOSING: '/admin/canteen/closing',
+  CANTEEN_CLOSED: '/admin/canteen/closed',
 
   MENU: '/menu',
   MENU_ITEM: (id) => `/menu/${id}`,
@@ -56,6 +59,7 @@ export const ENDPOINTS = {
   WS_TOPIC_ADMIN_ORDERS: '/topic/admin/orders',
   WS_TOPIC_KITCHEN_ORDERS: '/topic/kitchen/orders',
   WS_TOPIC_USER_PREFIX: '/topic/user',
+  WS_TOPIC_CANTEEN_STATUS: '/topic/canteen/status',
 }
 
 export const ORDER_STATUS = {

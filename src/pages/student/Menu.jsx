@@ -1,10 +1,18 @@
 import React, { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Search, Plus, Minus, ArrowRight, Star } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  Minus,
+  ArrowRight,
+  Star,
+  AlertTriangle,
+} from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useMenu } from '@/hooks/useMenu'
+import { CANTEEN_STATUS } from '@/services/canteenService'
 import { formatCurrency } from '@/utils/helpers'
 import {
   MENU_CATEGORIES,
@@ -16,6 +24,39 @@ import { SkeletonCard } from '@/components/ui/Skeleton'
 export default function StudentMenu() {
   const { addItem, removeItem, items: cartItems } = useCart()
   const { menu, loading, error } = useMenu()
+
+  const outletContext = useOutletContext() || {}
+
+  const fallbackCanteenStatus = {
+    status: CANTEEN_STATUS.CLOSED,
+    closingSoonUntil: null,
+    kitchenReady: false,
+    managerReady: false,
+    isOpen: false,
+    isOpening: false,
+    isClosing: false,
+    isClosed: true,
+    isOrderingAllowed: false,
+    hasClosingWarning: false,
+    loading: false,
+    error: '',
+    refresh: () => {},
+    remainingMs: 0,
+    countdown: '0:00',
+  }
+
+  const canteenStatus = outletContext.canteenStatus || fallbackCanteenStatus
+
+  const {
+    isOpen,
+    isOpening,
+    isClosing,
+    isClosed,
+    isOrderingAllowed,
+    hasClosingWarning,
+    countdown,
+  } = canteenStatus
+
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
 
@@ -54,6 +95,11 @@ export default function StudentMenu() {
   )
 
   const handleAdd = (item) => {
+    if (!isOrderingAllowed) {
+      toast.error('Canteen is not accepting new orders right now.')
+      return
+    }
+
     if (!item.available) {
       toast.error('This item is currently unavailable.')
       return
@@ -80,6 +126,52 @@ export default function StudentMenu() {
 
   return (
     <div className="space-y-5 pb-24 lg:space-y-6 lg:pb-6">
+      {isOpening && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Opening soon</p>
+            <p className="mt-1 text-xs">
+              The canteen is getting ready. Ordering will open shortly.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isClosing && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Not accepting new orders</p>
+            <p className="mt-1 text-xs">
+              The canteen is closing and only finishing existing orders.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isClosed && (
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-300 bg-slate-100 px-4 py-3 text-slate-700 dark:border-gray-700 dark:bg-gray-900 dark:text-slate-300">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Canteen is closed</p>
+            <p className="mt-1 text-xs">
+              You can browse the menu, but ordering is unavailable.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isOpen && hasClosingWarning && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          <p className="text-sm font-semibold">Closing soon</p>
+          <p className="mt-1 text-xs">
+            Orders are still open. Closing in{' '}
+            <span className="font-bold">{countdown}</span>.
+          </p>
+        </div>
+      )}
+
       <section className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -174,6 +266,7 @@ export default function StudentMenu() {
           <AnimatePresence>
             {filtered.map((item, i) => {
               const qty = cartQty(item.id)
+              const canInteract = item.available && isOrderingAllowed
 
               return (
                 <motion.article
@@ -277,7 +370,8 @@ export default function StudentMenu() {
                         <button
                           type="button"
                           onClick={() => handleAdd(item)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm transition hover:scale-105 active:scale-95"
+                          disabled={!canInteract}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm transition hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-gray-700"
                           aria-label={`Increase quantity of ${item.name}`}
                         >
                           <Plus size={16} />
@@ -287,11 +381,13 @@ export default function StudentMenu() {
                       <button
                         type="button"
                         onClick={() => handleAdd(item)}
-                        disabled={!item.available}
+                        disabled={!canInteract}
                         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
                       >
                         <Plus size={16} />
-                        Add to Cart
+                        {isOrderingAllowed
+                          ? 'Add to Cart'
+                          : 'Ordering Unavailable'}
                       </button>
                     )}
                   </div>

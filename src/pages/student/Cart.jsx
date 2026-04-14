@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { AlertTriangle } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useNotifications } from '@/context/NotificationContext'
+import { CANTEEN_STATUS } from '@/services/canteenService'
 import { cartService } from '@/services/cartService'
 import { formatCurrency } from '@/utils/helpers'
 
@@ -15,6 +17,39 @@ const PAYMENT_METHODS = [
 
 export default function StudentCart() {
   const navigate = useNavigate()
+
+  const outletContext = useOutletContext() || {}
+
+  const fallbackCanteenStatus = {
+    status: CANTEEN_STATUS.CLOSED,
+    closingSoonUntil: null,
+    kitchenReady: false,
+    managerReady: false,
+    isOpen: false,
+    isOpening: false,
+    isClosing: false,
+    isClosed: true,
+    isOrderingAllowed: false,
+    hasClosingWarning: false,
+    loading: false,
+    error: '',
+    refresh: () => {},
+    remainingMs: 0,
+    countdown: '0:00',
+  }
+
+  const canteenStatus = outletContext.canteenStatus || fallbackCanteenStatus
+
+  const {
+    isOpen,
+    isOpening,
+    isClosing,
+    isClosed,
+    isOrderingAllowed,
+    hasClosingWarning,
+    countdown,
+  } = canteenStatus
+
   const { items, total, count, updateQty, removeItem, clearCart, syncing } =
     useCart()
   const { addNotification } = useNotifications()
@@ -24,6 +59,11 @@ export default function StudentCart() {
   const [paymentMethod, setPaymentMethod] = useState('CASH')
 
   const handlePlaceOrder = async () => {
+    if (!isOrderingAllowed) {
+      toast.error('Canteen is not accepting new orders right now.')
+      return
+    }
+
     if (items.length === 0) {
       toast.error('Your cart is empty.')
       return
@@ -36,7 +76,7 @@ export default function StudentCart() {
 
       if (!backendCart?.items?.length) {
         toast.error(
-          'Your backend cart is empty. Please add the items again from the menu.'
+          'Your backend cart is empty. Please add items again from the menu.'
         )
         return
       }
@@ -209,6 +249,52 @@ export default function StudentCart() {
 
   return (
     <div className="animate-fade-in space-y-5">
+      {isOpening && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Ordering not open yet</p>
+            <p className="mt-1 text-xs">
+              The canteen is still opening. Checkout is disabled for now.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isClosing && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Checkout is unavailable</p>
+            <p className="mt-1 text-xs">
+              The canteen is closing and not accepting new orders.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isClosed && (
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-300 bg-slate-100 px-4 py-3 text-slate-700 dark:border-gray-700 dark:bg-gray-900 dark:text-slate-300">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Canteen is closed</p>
+            <p className="mt-1 text-xs">
+              New orders cannot be placed right now.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isOpen && hasClosingWarning && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          <p className="text-sm font-semibold">Place your order soon</p>
+          <p className="mt-1 text-xs">
+            Orders are still open. Closing in{' '}
+            <span className="font-bold">{countdown}</span>.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -347,10 +433,14 @@ export default function StudentCart() {
         <button
           type="button"
           onClick={handlePlaceOrder}
-          disabled={placing || syncing}
+          disabled={placing || syncing || !isOrderingAllowed}
           className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {placing ? 'Placing Order…' : `Place Order (${paymentMethod})`}
+          {!isOrderingAllowed
+            ? 'Ordering Unavailable'
+            : placing
+              ? 'Placing Order…'
+              : `Place Order (${paymentMethod})`}
         </button>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-500">
