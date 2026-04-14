@@ -143,8 +143,6 @@ export default function KitchenDashboard() {
     try {
       await completeOrder(order.id)
 
-      toast.success(`Order ${order.orderNumber || `#${order.id}`} completed ✓`)
-
       addNotification({
         type: 'complete',
         title: 'Order Completed',

@@ -78,8 +78,18 @@ export function getCanteenView(state) {
   const isClosed = state.status === CANTEEN_STATUS.CLOSED
   const isClosing = state.status === CANTEEN_STATUS.CLOSING
   const isClosingSoon =
-    isOpen && Boolean(state.closingSoonUntil)
+    isOpen && Boolean(state.closingSoonUntil) && new Date(state.closingSoonUntil) > new Date()
   const orderingCopy = getOrderingCopy(state.status)
+
+  // Override for closing-soon phase
+  const closingSoonCopy = isClosingSoon ? {
+    statusLabel: 'Closing Soon',
+    orderBlockedMessage: '',
+    orderActionLabel: 'Add to Cart',
+    checkoutActionLabel: 'Place Order',
+    orderNoticeTitle: 'Canteen is closing soon',
+    orderNoticeDescription: 'Place your order before time runs out.',
+  } : {}
 
   return {
     ...state,
@@ -90,6 +100,7 @@ export function getCanteenView(state) {
     isClosing,
     isClosingSoon,
     ...orderingCopy,
+    ...closingSoonCopy,
   }
 }
 

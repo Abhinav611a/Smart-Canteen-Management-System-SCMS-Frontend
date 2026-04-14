@@ -6,6 +6,7 @@ import {
   TimerReset,
 } from 'lucide-react'
 import { useCanteen } from '@/context/CanteenContext'
+import { useAuth } from '@/context/AuthContext'
 
 function TimeBox({ value, label, urgent = false }) {
   return (
@@ -159,8 +160,11 @@ export default function CanteenBanner() {
     countdown,
     remainingMs,
   } = useCanteen()
+  const { user } = useAuth()
+  const userRole = String(user?.role || '').toUpperCase()
+  const isStudent = userRole === 'USER'
 
-  if (isOpen && hasClosingWarning) {
+  if (isOpen && hasClosingWarning && isStudent) {
     return <ClosingSoonBanner countdown={countdown} remainingMs={remainingMs} />
   }
 

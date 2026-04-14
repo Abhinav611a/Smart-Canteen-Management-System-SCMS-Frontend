@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
+import { createContext, useContext, useReducer, useCallback, useEffect, useMemo } from 'react'
 import { useAuth } from './AuthContext'
 
 const NotificationContext = createContext(null)
@@ -33,10 +33,31 @@ const INITIAL_NOTIFICATIONS = [
 ]
 
 export function NotificationProvider({ children }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const [state, dispatch] = useReducer(reducer, { notifications: INITIAL_NOTIFICATIONS })
 
-  const unreadCount = state.notifications.filter(n => !n.read).length
+  const userRole = String(user?.role || '').toUpperCase()
+
+  const filteredNotifications = useMemo(() => {
+    return state.notifications.filter(notification => {
+      const type = notification.type
+
+      // Staff-only notifications
+      if (['complete'].includes(type)) {
+        return ['ADMIN', 'MANAGER', 'KITCHEN'].includes(userRole)
+      }
+
+      // User-specific notifications (but staff can see too)
+      if (['order', 'status'].includes(type)) {
+        return userRole === 'USER' || ['ADMIN', 'MANAGER', 'KITCHEN'].includes(userRole)
+      }
+
+      // General notifications (welcome, system)
+      return true
+    })
+  }, [state.notifications, userRole])
+
+  const unreadCount = filteredNotifications.filter(n => !n.read).length
 
   const addNotification = useCallback((notification) => {
     dispatch({
@@ -71,7 +92,7 @@ export function NotificationProvider({ children }) {
 
   return (
     <NotificationContext.Provider value={{
-      notifications: state.notifications,
+      notifications: filteredNotifications,
       unreadCount,
       addNotification,
       markRead,
