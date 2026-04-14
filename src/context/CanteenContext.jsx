@@ -10,6 +10,7 @@ import {
 } from 'react'
 import toast from 'react-hot-toast'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useAuth } from '@/context/AuthContext'
 import {
   canteenService,
   CANTEEN_STATUS,
@@ -46,6 +47,7 @@ function formatCountdown(ms) {
 }
 
 export function CanteenProvider({ children }) {
+  const { user } = useAuth()
   const [rawState, setRawState] = useState(DEFAULT_RAW_STATE)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,8 +55,15 @@ export function CanteenProvider({ children }) {
   const [now, setNow] = useState(Date.now()) // Used to trigger re-renders for countdown timer
   const [lastUpdate, setLastUpdate] = useState(null)
   const previousStatusRef = useRef(DEFAULT_RAW_STATE.status)
+  const hasWebSocketDataRef = useRef(false)
 
   const refresh = useCallback(async () => {
+    // If we have received websocket data, don't overwrite with potentially stale REST data
+    if (hasWebSocketDataRef.current) {
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError('')
@@ -87,7 +96,9 @@ export function CanteenProvider({ children }) {
       const nextState = normaliseCanteenState(payload)
       const previousStatus = previousStatusRef.current
 
+      // Show auto-close toast to all authenticated users (global state change)
       if (
+        user &&
         previousStatus === CANTEEN_STATUS.CLOSING &&
         nextState.status === CANTEEN_STATUS.CLOSED
       ) {
@@ -102,6 +113,7 @@ export function CanteenProvider({ children }) {
       setLoading(false)
       setError('')
       setNow(Date.now())
+      hasWebSocketDataRef.current = true
       setLastUpdate({
         at: Date.now(),
         payload: nextState,
