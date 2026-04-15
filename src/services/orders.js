@@ -74,6 +74,23 @@ function extractFilename(contentDisposition, fallback) {
   return fallback
 }
 
+function getFallbackInvoiceFilename(orderId) {
+  return `invoice-${orderId}.pdf`
+}
+
+function createInvoiceBlob(response) {
+  return new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/pdf',
+  })
+}
+
+function resolveInvoiceFilename(orderId, headers = {}) {
+  return extractFilename(
+    headers['content-disposition'],
+    getFallbackInvoiceFilename(orderId),
+  )
+}
+
 export const ordersService = {
   async getAll() {
     const list = await api.get(ENDPOINTS.ORDERS)
@@ -94,7 +111,7 @@ export const ordersService = {
     return api.post(ENDPOINTS.REORDER(orderId))
   },
 
-  async downloadInvoice(orderId) {
+  async fetchInvoiceAsset(orderId) {
     const response = await apiClient.get(ENDPOINTS.INVOICE(orderId), {
       responseType: 'blob',
       headers: {
@@ -102,26 +119,37 @@ export const ordersService = {
       },
     })
 
-    const blob = new Blob([response.data], {
-      type: response.headers['content-type'] || 'application/pdf',
-    })
+    return {
+      blob: createInvoiceBlob(response),
+      filename: resolveInvoiceFilename(orderId, response.headers),
+    }
+  },
 
-    const fallbackName = `invoice-order-${orderId}.pdf`
-    const filename = extractFilename(
-      response.headers['content-disposition'],
-      fallbackName,
-    )
+  async fetchInvoiceBlob(orderId) {
+    const { blob } = await this.fetchInvoiceAsset(orderId)
+    return blob
+  },
 
+  downloadInvoiceBlob(blob, orderId, filename = getFallbackInvoiceFilename(orderId)) {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
+
+    try {
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+    } finally {
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    }
 
     return true
+  },
+
+  async downloadInvoice(orderId) {
+    const { blob, filename } = await this.fetchInvoiceAsset(orderId)
+    return this.downloadInvoiceBlob(blob, orderId, filename)
   },
 
   async getInvoice(orderId) {

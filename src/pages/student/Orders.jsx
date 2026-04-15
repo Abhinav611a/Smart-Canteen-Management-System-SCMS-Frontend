@@ -1,10 +1,10 @@
 /**
  * StudentOrders.jsx
  * ──────────────────
- * Student order history with live updates, reorder, and invoice download.
+ * Student order history with live updates, reorder, rating, and invoice preview.
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
@@ -15,6 +15,7 @@ import { useCanteen } from '@/context/CanteenContext'
 import { ordersService } from '@/services/orders'
 import { ratingService } from '@/services/ratingService'
 import RatingModal from '@/components/ui/RatingModal'
+import InvoicePreviewModal from '@/components/ui/InvoicePreviewModal'
 import {
   ORDER_STATUS,
   ORDER_STATUS_ICONS,
@@ -30,6 +31,16 @@ const STEPS = [
   ORDER_STATUS.READY,
   ORDER_STATUS.COMPLETED,
 ]
+
+const INITIAL_INVOICE_PREVIEW = {
+  isOpen: false,
+  orderId: null,
+  orderNumber: '',
+  blobUrl: '',
+  filename: '',
+  loading: false,
+  error: '',
+}
 
 function getStatusBadgeClass(status) {
   switch (status) {
@@ -158,8 +169,23 @@ export default function StudentOrders() {
 
   const [expandedId, setExpandedId] = useState(null)
   const [reorderingId, setReorderingId] = useState(null)
-  const [invoiceId, setInvoiceId] = useState(null)
+  const [invoicePreview, setInvoicePreview] = useState(INITIAL_INVOICE_PREVIEW)
   const [ratingModal, setRatingModal] = useState({ open: false, item: null })
+  const invoicePreviewRequestRef = useRef(0)
+
+  useEffect(() => {
+    return () => {
+      invoicePreviewRequestRef.current += 1
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (invoicePreview.blobUrl) {
+        window.URL.revokeObjectURL(invoicePreview.blobUrl)
+      }
+    }
+  }, [invoicePreview.blobUrl])
 
   const { isConnected } = useWebSocket(
     'user:orders',
@@ -212,17 +238,77 @@ export default function StudentOrders() {
   }
 
   const handleInvoice = async (order) => {
-    setInvoiceId(order.id)
+    const requestId = invoicePreviewRequestRef.current + 1
+    const orderNumber = order.orderNumber || `#${order.id}`
+
+    invoicePreviewRequestRef.current = requestId
+    setInvoicePreview({
+      isOpen: true,
+      orderId: order.id,
+      orderNumber,
+      blobUrl: '',
+      filename: `invoice-${order.id}.pdf`,
+      loading: true,
+      error: '',
+    })
 
     try {
-      await ordersService.getInvoice(order.id)
-      toast.success('Invoice downloaded!')
+      const { blob, filename } = await ordersService.fetchInvoiceAsset(order.id)
+      const blobUrl = window.URL.createObjectURL(blob)
+
+      if (invoicePreviewRequestRef.current !== requestId) {
+        window.URL.revokeObjectURL(blobUrl)
+        return
+      }
+
+      setInvoicePreview({
+        isOpen: true,
+        orderId: order.id,
+        orderNumber,
+        blobUrl,
+        filename,
+        loading: false,
+        error: '',
+      })
     } catch (err) {
-      toast.error(`Invoice download failed: ${err.message}`)
-    } finally {
-      setInvoiceId(null)
+      if (invoicePreviewRequestRef.current !== requestId) return
+
+      const message = err?.message || 'Failed to load invoice preview.'
+
+      setInvoicePreview({
+        isOpen: true,
+        orderId: order.id,
+        orderNumber,
+        blobUrl: '',
+        filename: `invoice-${order.id}.pdf`,
+        loading: false,
+        error: message,
+      })
+      toast.error(`Invoice preview failed: ${message}`)
     }
   }
+
+  const handleCloseInvoicePreview = useCallback(() => {
+    invoicePreviewRequestRef.current += 1
+    setInvoicePreview(INITIAL_INVOICE_PREVIEW)
+  }, [])
+
+  const handleDownloadInvoicePreview = useCallback(() => {
+    if (!invoicePreview.blobUrl) return
+
+    const link = document.createElement('a')
+    link.href = invoicePreview.blobUrl
+    link.download =
+      invoicePreview.filename ||
+      `invoice-${invoicePreview.orderId || 'order'}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }, [
+    invoicePreview.blobUrl,
+    invoicePreview.filename,
+    invoicePreview.orderId,
+  ])
 
   const handleRatingSubmit = async ({ rating, review }) => {
     if (!ratingModal.item) return
@@ -467,13 +553,14 @@ export default function StudentOrders() {
                     {order.canDownloadInvoice && (
                       <button
                         type="button"
-                        disabled={invoiceId === order.id}
+                        disabled={invoicePreview.loading}
                         onClick={() => handleInvoice(order)}
                         className="rounded-2xl px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-emerald-500/10"
                       >
-                        {invoiceId === order.id
-                          ? 'Downloading...'
-                          : 'Download Invoice'}
+                        {invoicePreview.loading &&
+                        invoicePreview.orderId === order.id
+                          ? 'Loading Invoice...'
+                          : 'View Invoice'}
                       </button>
                     )}
                   </div>
@@ -489,6 +576,18 @@ export default function StudentOrders() {
         onClose={() => setRatingModal({ open: false, item: null })}
         itemName={ratingModal.item?.name || ''}
         onSubmit={handleRatingSubmit}
+      />
+
+      <InvoicePreviewModal
+        open={invoicePreview.isOpen}
+        orderId={invoicePreview.orderId}
+        orderLabel={invoicePreview.orderNumber}
+        blobUrl={invoicePreview.blobUrl}
+        filename={invoicePreview.filename}
+        loading={invoicePreview.loading}
+        error={invoicePreview.error}
+        onDownload={handleDownloadInvoicePreview}
+        onClose={handleCloseInvoicePreview}
       />
     </div>
   )
