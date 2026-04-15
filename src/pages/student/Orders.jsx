@@ -13,6 +13,8 @@ import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useCanteen } from '@/context/CanteenContext'
 import { ordersService } from '@/services/orders'
+import { ratingService } from '@/services/ratingService'
+import RatingModal from '@/components/ui/RatingModal'
 import {
   ORDER_STATUS,
   ORDER_STATUS_ICONS,
@@ -157,6 +159,7 @@ export default function StudentOrders() {
   const [expandedId, setExpandedId] = useState(null)
   const [reorderingId, setReorderingId] = useState(null)
   const [invoiceId, setInvoiceId] = useState(null)
+  const [ratingModal, setRatingModal] = useState({ open: false, item: null })
 
   const { isConnected } = useWebSocket(
     'user:orders',
@@ -228,6 +231,23 @@ export default function StudentOrders() {
       toast.error(`Invoice download failed: ${err.message}`)
     } finally {
       setInvoiceId(null)
+    }
+  }
+
+  const handleRatingSubmit = async ({ rating, review }) => {
+    if (!ratingModal.item) return
+
+    try {
+      await ratingService.submitRating({
+        foodItemId: ratingModal.item.foodItemId,
+        rating,
+        review,
+      })
+      toast.success('Rating submitted successfully!')
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Cannot rate this item'
+      toast.error(message)
+      throw err // Re-throw to prevent modal from closing
     }
   }
 
@@ -414,9 +434,20 @@ export default function StudentOrders() {
                             <span className="truncate">{item.name}</span>
                           </span>
 
-                          <span className="shrink-0 font-medium">
-                            {formatCurrency(item.price)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-medium">
+                              {formatCurrency(item.price)}
+                            </span>
+                            {order.status === ORDER_STATUS.COMPLETED && (
+                              <button
+                                type="button"
+                                onClick={() => setRatingModal({ open: true, item })}
+                                className="text-xs px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:hover:bg-emerald-500/25 transition-colors"
+                              >
+                                Rate
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -462,6 +493,13 @@ export default function StudentOrders() {
           )
         })}
       </div>
+
+      <RatingModal
+        open={ratingModal.open}
+        onClose={() => setRatingModal({ open: false, item: null })}
+        itemName={ratingModal.item?.name || ''}
+        onSubmit={handleRatingSubmit}
+      />
     </div>
   )
 }

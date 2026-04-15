@@ -83,6 +83,7 @@ function getEmptyStateText(activeTab, canteen) {
 export default function ChefOrders() {
   const [activeTab, setActiveTab] = useState('monitor')
   const canteen = useCanteen()
+  const operationalActionsBlocked = canteen.isClosed || canteen.isOpening
 
   const currentScope =
     TAB_CONFIG.find((t) => t.key === activeTab)?.scope ?? 'monitor'
@@ -119,8 +120,12 @@ export default function ChefOrders() {
   )
 
   const handleComplete = async (order) => {
-    if (canteen.isClosed) {
-      toast.error('Canteen is closed. Completion actions are disabled.')
+    if (operationalActionsBlocked) {
+      toast.error(
+        canteen.isOpening
+          ? 'Canteen is opening soon. Completion actions stay disabled until service begins.'
+          : 'Canteen is closed. Completion actions are disabled.'
+      )
       return
     }
 
@@ -327,10 +332,14 @@ export default function ChefOrders() {
                     className="w-full"
                     onClick={() => handleComplete(order)}
                     loading={completingId === order.id}
-                    disabled={canteen.isClosed}
+                    disabled={operationalActionsBlocked}
                     icon="📦"
                   >
-                    {canteen.isClosed ? 'Unavailable While Closed' : 'Mark as Completed'}
+                    {canteen.isOpening
+                      ? 'Unavailable Until Open'
+                      : canteen.isClosed
+                        ? 'Unavailable While Closed'
+                        : 'Mark as Completed'}
                   </Button>
                 )}
               </motion.div>

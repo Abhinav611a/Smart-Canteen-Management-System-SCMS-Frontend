@@ -55,6 +55,8 @@ export const ENDPOINTS = {
   ANALYTICS_TOP_ITEMS: '/analytics/top-items',
   ANALYTICS_CATEGORY_SALES: '/analytics/category-sales',
 
+  RATING_RATE: '/rating/rate',
+
   WS_ENDPOINT: '/ws-orders',
   WS_TOPIC_ADMIN_ORDERS: '/topic/admin/orders',
   WS_TOPIC_KITCHEN_ORDERS: '/topic/kitchen/orders',

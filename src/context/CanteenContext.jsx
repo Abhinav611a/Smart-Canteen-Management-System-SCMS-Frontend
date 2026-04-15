@@ -51,44 +51,11 @@ export function CanteenProvider({ children }) {
   const [rawState, setRawState] = useState(DEFAULT_RAW_STATE)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // eslint-disable-next-line no-unused-vars
   const [now, setNow] = useState(Date.now()) // Used to trigger re-renders for countdown timer
   const [lastUpdate, setLastUpdate] = useState(null)
   const previousStatusRef = useRef(DEFAULT_RAW_STATE.status)
   const hasWebSocketDataRef = useRef(false)
-
-  const refresh = useCallback(async () => {
-    // If we have received websocket data, don't overwrite with potentially stale REST data
-    if (hasWebSocketDataRef.current) {
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError('')
-
-      const state = await canteenService.getState()
-      const nextState = normaliseCanteenState(state)
-
-      setRawState(nextState)
-      previousStatusRef.current = nextState.status
-      setNow(Date.now())
-    } catch (err) {
-      console.warn('[CANTEEN] Failed to fetch state:', err)
-      setError(err?.message || 'Failed to fetch canteen status')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    refresh()
-  }, [refresh])
-
-  useEffect(() => {
-    previousStatusRef.current = rawState.status
-  }, [rawState.status])
+  const isConnectedRef = useRef(false)
 
   const { isConnected } = useWebSocket(
     'canteen:status',
@@ -121,10 +88,55 @@ export function CanteenProvider({ children }) {
     },
     true
   )
+  isConnectedRef.current = isConnected
+
+  const refresh = useCallback(async () => {
+    // Only skip REST refresh when websocket is connected and has provided data
+    if (isConnected && hasWebSocketDataRef.current) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError('')
+
+      const state = await canteenService.getState()
+      const nextState = normaliseCanteenState(state)
+
+      // Ignore stale REST data if websocket became authoritative while fetching.
+      if (isConnectedRef.current && hasWebSocketDataRef.current) {
+        return
+      }
+
+      setRawState(nextState)
+      previousStatusRef.current = nextState.status
+      setNow(Date.now())
+    } catch (err) {
+      console.warn('[CANTEEN] Failed to fetch state:', err)
+      setError(err?.message || 'Failed to fetch canteen status')
+    } finally {
+      setLoading(false)
+    }
+  }, [isConnected])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    if (!isConnected) {
+      hasWebSocketDataRef.current = false
+    }
+  }, [isConnected])
+
+  useEffect(() => {
+    previousStatusRef.current = rawState.status
+  }, [rawState.status])
 
   const remainingMs = useMemo(
     () => getRemainingMs(rawState.closingSoonUntil),
-    [rawState.closingSoonUntil]
+    [rawState.closingSoonUntil, now]
   )
 
   useEffect(() => {

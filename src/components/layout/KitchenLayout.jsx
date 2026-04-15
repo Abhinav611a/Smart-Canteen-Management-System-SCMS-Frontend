@@ -322,7 +322,8 @@ function OrderCard({
   isConnected,
   queuedAction,
   isFlushingQueue,
-  canteenClosed,
+  canteenActionsBlocked,
+  canteenOpening,
 }) {
   const t = themeMap[mode]
   const s = getStatusStyle(order.priority, mode, order.status)
@@ -332,11 +333,12 @@ function OrderCard({
     updating ||
     isFlushingQueue ||
     !isConnected ||
-    canteenClosed
+    canteenActionsBlocked
   const elapsed = formatElapsedTime(getElapsedSecondsFromPreparing(order, nowTs))
 
   let buttonText = actionLabel
-  if (canteenClosed) buttonText = 'Unavailable While Closed'
+  if (canteenOpening) buttonText = 'Unavailable Until Open'
+  else if (canteenActionsBlocked) buttonText = 'Unavailable While Closed'
   else if (queuedAction && !isConnected) buttonText = 'Queued Offline'
   else if (queuedAction && isFlushingQueue) buttonText = 'Syncing...'
   else if (updating) buttonText = 'Updating...'
@@ -503,6 +505,7 @@ export default function KitchenLayout() {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const canteen = useCanteenStatus(true)
+  const operationalActionsBlocked = canteen.isClosed || canteen.isOpening
   const t = themeMap[theme]
 
   const fetchKitchenOrders = async (showLoader = true) => {
@@ -611,7 +614,14 @@ export default function KitchenLayout() {
 
   useEffect(() => {
     const flushQueuedActions = async () => {
-      if (!isConnected || queuedActions.length === 0 || isFlushingQueue) return
+      if (
+        !isConnected ||
+        queuedActions.length === 0 ||
+        isFlushingQueue ||
+        operationalActionsBlocked
+      ) {
+        return
+      }
 
       setIsFlushingQueue(true)
       try {
@@ -644,7 +654,7 @@ export default function KitchenLayout() {
     }
 
     flushQueuedActions()
-  }, [isConnected, queuedActions, isFlushingQueue])
+  }, [isConnected, queuedActions, isFlushingQueue, operationalActionsBlocked])
 
   const counts = useMemo(() => {
     return {
@@ -680,8 +690,12 @@ export default function KitchenLayout() {
   }, [queuedActions])
 
   const handlePromoteStatus = async (orderId, currentStatus) => {
-    if (canteen.isClosed) {
-      toast.error('Canteen is closed. Actions are disabled.')
+    if (operationalActionsBlocked) {
+      toast.error(
+        canteen.isOpening
+          ? 'Canteen is opening soon. Kitchen actions stay disabled until service begins.'
+          : 'Canteen is closed. Actions are disabled.'
+      )
       return
     }
 
@@ -934,7 +948,8 @@ export default function KitchenLayout() {
                     isConnected={isConnected}
                     queuedAction={queuedActionsMap[order.id]}
                     isFlushingQueue={isFlushingQueue}
-                    canteenClosed={canteen.isClosed}
+                    canteenActionsBlocked={operationalActionsBlocked}
+                    canteenOpening={canteen.isOpening}
                   />
                 ))}
               </div>
