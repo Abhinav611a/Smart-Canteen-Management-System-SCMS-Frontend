@@ -98,7 +98,7 @@ export const ordersService = {
     const response = await apiClient.get(ENDPOINTS.INVOICE(orderId), {
       responseType: 'blob',
       headers: {
-        Accept: '*/*',
+        Accept: 'application/pdf',
       },
     })
 

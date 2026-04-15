@@ -11,12 +11,12 @@ export const ratingService = {
       throw new Error('Rating must be between 1 and 5')
     }
 
-    const payload = {
+    const params = {
       foodItemId: Number(foodItemId),
       rating: Number(rating),
       review: review?.trim() || undefined,
     }
 
-    return api.post(ENDPOINTS.RATING_RATE, payload)
+    return api.post(ENDPOINTS.RATING_RATE, null, { params })
   },
 }

@@ -9,6 +9,18 @@ let isRefreshing = false
 let refreshPromise = null
 let silentRefreshTimer = null
 
+function getRequestLogContext(config = {}) {
+  const headers = config.headers || {}
+
+  return {
+    method: String(config.method || 'get').toUpperCase(),
+    url: config.url || '',
+    responseType: config.responseType || 'json',
+    accept: headers.Accept || headers.accept || '',
+    retry: Boolean(config._retry),
+  }
+}
+
 function decodeJwtPayload(token) {
   try {
     const base64 = token.split('.')[1]
@@ -173,6 +185,13 @@ export async function refreshAccessTokenSilently() {
 
 apiClient.interceptors.response.use(
   (response) => {
+    if (
+      response.config?.responseType === 'blob' ||
+      response.config?.responseType === 'arraybuffer'
+    ) {
+      return response
+    }
+
     const body = response.data
 
     if (body && typeof body === 'object' && 'success' in body) {
@@ -190,6 +209,7 @@ apiClient.interceptors.response.use(
     const body = error.response?.data
     const url = error.config?.url || ''
     const originalRequest = error.config || {}
+    const requestContext = getRequestLogContext(originalRequest)
 
     const message =
       body?.message ||
@@ -209,10 +229,12 @@ apiClient.interceptors.response.use(
       !isPublicAuthEndpoint(url) &&
       !originalRequest._retry
     ) {
+      console.warn('[API] 401 received for request', requestContext)
       originalRequest._retry = true
 
       try {
         if (!isRefreshing) {
+          console.info('[API] Attempting token refresh', requestContext)
           isRefreshing = true
           refreshPromise = refreshAccessTokenSilently().finally(() => {
             isRefreshing = false
@@ -225,9 +247,18 @@ apiClient.interceptors.response.use(
         originalRequest.headers = originalRequest.headers || {}
         originalRequest.headers.Authorization = `Bearer ${newToken}`
 
+        console.info(
+          '[API] Retrying request after refresh',
+          getRequestLogContext(originalRequest)
+        )
+
         return apiClient(originalRequest)
       } catch (refreshError) {
-        console.error('[API] refresh failed', refreshError)
+        console.error(
+          '[API] Final failure during refresh/retry flow',
+          requestContext,
+          refreshError
+        )
 
         clearStoredAuthStorage()
         delete apiClient.defaults.headers.common.Authorization
@@ -239,6 +270,10 @@ apiClient.interceptors.response.use(
 
         return Promise.reject(refreshError)
       }
+    }
+
+    if (status === 401 && !isPublicAuthEndpoint(url) && originalRequest._retry) {
+      console.error('[API] Final failure after retry', requestContext)
     }
 
     switch (true) {

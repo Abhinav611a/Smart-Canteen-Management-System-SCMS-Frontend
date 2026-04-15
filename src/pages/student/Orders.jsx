@@ -215,17 +215,7 @@ export default function StudentOrders() {
     setInvoiceId(order.id)
 
     try {
-      const lines = await ordersService.getInvoice(order.id)
-      const content = Array.isArray(lines) ? lines.join('\n') : String(lines)
-      const blob = new Blob([content], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-
-      a.href = url
-      a.download = `invoice-${order.orderNumber || order.id}.txt`
-      a.click()
-
-      URL.revokeObjectURL(url)
+      await ordersService.getInvoice(order.id)
       toast.success('Invoice downloaded!')
     } catch (err) {
       toast.error(`Invoice download failed: ${err.message}`)
