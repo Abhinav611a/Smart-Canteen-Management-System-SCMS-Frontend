@@ -34,7 +34,6 @@ export const ENDPOINTS = {
   CART: '/cart',
   CART_ADD: '/cart/add',
   CART_ITEM: (id) => `/cart/item/${id}`,
-  CART_CHECKOUT: '/cart/checkout',
 
   ORDERS: '/orders',
   ORDER: (id) => `/orders/${id}`,

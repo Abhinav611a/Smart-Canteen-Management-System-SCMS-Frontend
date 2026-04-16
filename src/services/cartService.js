@@ -2,6 +2,8 @@ import api from './api'
 import { ENDPOINTS, LS_KEYS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
 
+const PAYMENT_METHODS = new Set(['CASH', 'CARD', 'UPI'])
+
 function normaliseCartItem(item) {
   const food = item?.foodItem ?? item?.menuItem ?? item
   const qty = Number(item?.quantity ?? item?.qty ?? 1)
@@ -133,6 +135,31 @@ export function isCartMismatchError(error) {
   )
 }
 
+function normalisePaymentMethod(paymentMethod = 'CASH') {
+  const normalized = String(paymentMethod || 'CASH').trim().toUpperCase()
+  return PAYMENT_METHODS.has(normalized) ? normalized : 'CASH'
+}
+
+export function buildCheckoutPayload(cart, data = {}) {
+  const items = (cart?.items ?? [])
+    .map(normaliseCartItem)
+    .map((item) => ({
+      foodItemId: Number(item.foodItemId ?? item.id),
+      quantity: Number(item.qty ?? item.quantity ?? 0),
+    }))
+    .filter(
+      (item) =>
+        Number.isFinite(item.foodItemId) &&
+        Number.isFinite(item.quantity) &&
+        item.quantity > 0,
+    )
+
+  return {
+    items,
+    paymentMethod: normalisePaymentMethod(data.paymentMethod),
+  }
+}
+
 export const cartService = {
   isBackendEnabled() {
     return hasToken()
@@ -202,7 +229,15 @@ export const cartService = {
       throw error
     }
 
-    const raw = await api.post(ENDPOINTS.CART_CHECKOUT, data)
+    const payload = buildCheckoutPayload(cart, data)
+
+    if (!payload.items.length) {
+      const error = new Error('Cart not found or empty')
+      error.code = 'CART_EMPTY'
+      throw error
+    }
+
+    const raw = await api.post(ENDPOINTS.ORDERS, payload)
     return normaliseOrder(raw)
   },
 }
