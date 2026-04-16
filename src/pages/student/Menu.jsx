@@ -21,7 +21,7 @@ import {
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
 export default function StudentMenu() {
-  const { addItem, removeItem, items: cartItems } = useCart()
+  const { addItem, removeItem, items: cartItems, syncing: cartSyncing } = useCart()
   const { menu, loading, error } = useMenu()
   const {
     loading: canteenLoading,
@@ -88,7 +88,9 @@ export default function StudentMenu() {
     }
 
     try {
-      await addItem(item)
+      const updatedCart = await addItem(item)
+      if (!updatedCart) return
+
       toast.success(`${item.emoji} ${item.name} added to cart!`, {
         id: `add-${item.id}`,
       })
@@ -102,7 +104,8 @@ export default function StudentMenu() {
     if (qty <= 0) return
 
     try {
-      await removeItem(item.id)
+      const updatedCart = await removeItem(item.id)
+      if (!updatedCart) return
 
       if (qty === 1) {
         toast(`${item.emoji} ${item.name} removed from cart`, {
@@ -221,7 +224,7 @@ export default function StudentMenu() {
           <AnimatePresence>
             {filtered.map((item, i) => {
               const qty = cartQty(item.id)
-              const canInteract = item.available && isOrderingAllowed
+              const canInteract = item.available && isOrderingAllowed && !cartSyncing
 
               return (
                 <motion.article
@@ -310,7 +313,8 @@ export default function StudentMenu() {
                         <button
                           type="button"
                           onClick={() => handleDecrease(item)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-emerald-600 shadow-sm transition hover:scale-105 active:scale-95 dark:bg-gray-900"
+                          disabled={cartSyncing}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-emerald-600 shadow-sm transition hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900"
                           aria-label={`Decrease quantity of ${item.name}`}
                         >
                           <Minus size={16} />

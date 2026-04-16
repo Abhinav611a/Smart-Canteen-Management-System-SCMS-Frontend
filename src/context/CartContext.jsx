@@ -19,15 +19,14 @@ const initialState = {
   items: [],
   loading: false,
   syncing: false,
+  dirty: false,
+  outOfSync: false,
 }
 
 function cartReducer(state, action) {
   switch (action.type) {
-    case 'SET_LOADING':
-      return { ...state, loading: action.value }
-
-    case 'SET_SYNCING':
-      return { ...state, syncing: action.value }
+    case 'SET_STATUS':
+      return { ...state, ...action.value }
 
     case 'HYDRATE':
     case 'SET_CART':
@@ -43,7 +42,7 @@ function cartReducer(state, action) {
           items: state.items.map((item) =>
             item.id === action.item.id
               ? { ...item, qty: nextQty, quantity: nextQty }
-              : item
+              : item,
           ),
         }
       }
@@ -54,12 +53,6 @@ function cartReducer(state, action) {
       }
     }
 
-    case 'REMOVE_LOCAL':
-      return {
-        ...state,
-        items: state.items.filter((item) => item.id !== action.id),
-      }
-
     case 'UPDATE_LOCAL':
       return {
         ...state,
@@ -69,7 +62,7 @@ function cartReducer(state, action) {
             : state.items.map((item) =>
                 item.id === action.id
                   ? { ...item, qty: action.qty, quantity: action.qty }
-                  : item
+                  : item,
               ),
       }
 
@@ -78,6 +71,24 @@ function cartReducer(state, action) {
 
     default:
       return state
+  }
+}
+
+function buildCartSummary(items = []) {
+  const safeItems = Array.isArray(items) ? items : []
+
+  return {
+    id: null,
+    items: safeItems,
+    total: safeItems.reduce(
+      (sum, item) =>
+        sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
+      0,
+    ),
+    count: safeItems.reduce(
+      (sum, item) => sum + (item.qty || item.quantity || 0),
+      0,
+    ),
   }
 }
 
@@ -95,6 +106,8 @@ export function CartProvider({ children }) {
 
   const itemsRef = useRef(state.items)
   const hydratedRef = useRef(false)
+  const fetchCountRef = useRef(0)
+  const mutationCountRef = useRef(0)
 
   useEffect(() => {
     itemsRef.current = state.items
@@ -104,43 +117,111 @@ export function CartProvider({ children }) {
     localStorage.setItem(LS_KEYS.CART, JSON.stringify(items))
   }, [])
 
-  const syncFromBackend = useCallback(async () => {
-    if (!cartService.isBackendEnabled() || !isCartRole) return
+  const clearPersistedLocalCart = useCallback(() => {
+    localStorage.removeItem(LS_KEYS.CART)
+  }, [])
 
-    dispatch({ type: 'SET_LOADING', value: true })
+  const syncActivityFlags = useCallback(() => {
+    dispatch({
+      type: 'SET_STATUS',
+      value: {
+        loading: fetchCountRef.current > 0,
+        syncing: fetchCountRef.current > 0 || mutationCountRef.current > 0,
+        dirty: mutationCountRef.current > 0,
+      },
+    })
+  }, [])
 
-    try {
-      const cart = await cartService.getCart()
-      const backendItems = cart?.items ?? []
+  const beginFetch = useCallback(() => {
+    fetchCountRef.current += 1
+    syncActivityFlags()
+  }, [syncActivityFlags])
 
-      // Always sync local state to backend state - backend is source of truth
-      dispatch({ type: 'SET_CART', items: backendItems })
-      persistLocalCart(backendItems)
-    } catch (error) {
-      console.warn('Failed to load backend cart:', error.message)
+  const endFetch = useCallback(() => {
+    fetchCountRef.current = Math.max(0, fetchCountRef.current - 1)
+    syncActivityFlags()
+  }, [syncActivityFlags])
 
-      const message = error?.message?.toLowerCase?.() || ''
-      const status = error?.response?.status
+  const beginMutation = useCallback(() => {
+    mutationCountRef.current += 1
+    syncActivityFlags()
+  }, [syncActivityFlags])
 
-      const isCartMissing =
-        message.includes('cart not found') ||
-        message.includes('404') ||
-        status === 404
+  const endMutation = useCallback(() => {
+    mutationCountRef.current = Math.max(0, mutationCountRef.current - 1)
+    syncActivityFlags()
+  }, [syncActivityFlags])
 
-      const isBackend500 = status === 500
+  const applyCart = useCallback(
+    (cart, { outOfSync = false } = {}) => {
+      const nextItems = cart?.items ?? []
+      dispatch({ type: 'SET_CART', items: nextItems })
+      dispatch({
+        type: 'SET_STATUS',
+        value: { outOfSync },
+      })
+      persistLocalCart(nextItems)
+      return cart ?? buildCartSummary(nextItems)
+    },
+    [persistLocalCart],
+  )
 
-      if (isCartMissing || isBackend500) {
-        // Backend says cart is empty - clear all local state
-        dispatch({ type: 'SET_CART', items: [] })
-        persistLocalCart([])
-        return
+  const syncFromBackend = useCallback(
+    async ({ apply = true, silent = false } = {}) => {
+      if (!cartService.isBackendEnabled() || !isCartRole) {
+        const fallbackCart = buildCartSummary(itemsRef.current)
+
+        if (apply) {
+          dispatch({
+            type: 'SET_STATUS',
+            value: { outOfSync: false },
+          })
+        }
+
+        return fallbackCart
       }
 
-      toast.error(error.message || 'Failed to load cart.')
-    } finally {
-      dispatch({ type: 'SET_LOADING', value: false })
-    }
-  }, [isCartRole, persistLocalCart])
+      beginFetch()
+
+      try {
+        const cart = await cartService.getCart()
+        return apply ? applyCart(cart) : cart
+      } catch (error) {
+        console.warn('Failed to load backend cart:', error.message)
+
+        const message = error?.message?.toLowerCase?.() || ''
+        const status = error?.response?.status
+
+        const isCartMissing =
+          message.includes('cart not found') ||
+          message.includes('404') ||
+          status === 404
+
+        const isBackend500 = status === 500
+
+        if (isCartMissing || isBackend500) {
+          const emptyCart = { id: null, items: [], total: 0, count: 0 }
+          return apply ? applyCart(emptyCart) : emptyCart
+        }
+
+        if (apply) {
+          dispatch({
+            type: 'SET_STATUS',
+            value: { outOfSync: true },
+          })
+        }
+
+        if (!silent) {
+          toast.error(error.message || 'Failed to load cart.')
+        }
+
+        throw error
+      } finally {
+        endFetch()
+      }
+    },
+    [applyCart, beginFetch, endFetch, isCartRole],
+  )
 
   useEffect(() => {
     try {
@@ -149,11 +230,11 @@ export function CartProvider({ children }) {
         dispatch({ type: 'HYDRATE', items: JSON.parse(saved) })
       }
     } catch {
-      localStorage.removeItem(LS_KEYS.CART)
+      clearPersistedLocalCart()
     } finally {
       hydratedRef.current = true
     }
-  }, [])
+  }, [clearPersistedLocalCart])
 
   useEffect(() => {
     if (!hydratedRef.current) return
@@ -164,12 +245,58 @@ export function CartProvider({ children }) {
     if (!hydratedRef.current) return
 
     if (isAuthenticated && isCartRole) {
-      syncFromBackend()
+      syncFromBackend({ silent: true }).catch(() => null)
     } else {
       dispatch({ type: 'CLEAR' })
-      localStorage.removeItem(LS_KEYS.CART)
+      dispatch({
+        type: 'SET_STATUS',
+        value: { outOfSync: false },
+      })
+      clearPersistedLocalCart()
     }
-  }, [isAuthenticated, isCartRole, syncFromBackend])
+  }, [clearPersistedLocalCart, isAuthenticated, isCartRole, syncFromBackend])
+
+  const runCartMutation = useCallback(
+    async (operation, fallbackOperation, failureMessage) => {
+      if (!cartService.isBackendEnabled() || !isCartRole) {
+        const result = fallbackOperation?.()
+        const nextItems = itemsRef.current
+
+        dispatch({
+          type: 'SET_STATUS',
+          value: { outOfSync: false },
+        })
+        persistLocalCart(nextItems)
+        return result ?? buildCartSummary(nextItems)
+      }
+
+      if (mutationCountRef.current > 0 || fetchCountRef.current > 0) {
+        return null
+      }
+
+      beginMutation()
+
+      try {
+        const updatedCart = await operation()
+        return applyCart(updatedCart)
+      } catch (error) {
+        if (error?.latestCart) {
+          applyCart(error.latestCart, { outOfSync: true })
+        } else {
+          dispatch({
+            type: 'SET_STATUS',
+            value: { outOfSync: true },
+          })
+        }
+
+        toast.error(error.message || failureMessage)
+        throw error
+      } finally {
+        endMutation()
+      }
+    },
+    [applyCart, beginMutation, endMutation, isCartRole, persistLocalCart],
+  )
 
   const addItem = useCallback(
     async (item) => {
@@ -179,31 +306,24 @@ export function CartProvider({ children }) {
       }
 
       if (!isOrderingAllowed) {
-        toast.error(orderBlockedMessage || 'Canteen is not accepting new orders right now.')
+        toast.error(
+          orderBlockedMessage || 'Canteen is not accepting new orders right now.',
+        )
         return
       }
 
-      if (!cartService.isBackendEnabled() || !isCartRole) {
-        dispatch({ type: 'ADD_LOCAL', item })
-        return
-      }
-
-      dispatch({ type: 'SET_SYNCING', value: true })
-
-      try {
-        // Add item to backend
-        await cartService.addItem(item, 1)
-        // Refetch cart from backend after mutation to ensure state is in sync
-        const updatedCart = await cartService.getCart()
-        dispatch({ type: 'SET_CART', items: updatedCart?.items ?? [] })
-      } catch (error) {
-        toast.error(error.message || 'Failed to add item to cart.')
-        throw error
-      } finally {
-        dispatch({ type: 'SET_SYNCING', value: false })
-      }
+      return runCartMutation(
+        () => cartService.addItem(item, 1),
+        () => dispatch({ type: 'ADD_LOCAL', item }),
+        'Failed to add item to cart.',
+      )
     },
-    [canteenLoading, isCartRole, isOrderingAllowed, orderBlockedMessage]
+    [
+      canteenLoading,
+      isOrderingAllowed,
+      orderBlockedMessage,
+      runCartMutation,
+    ],
   )
 
   const removeItem = useCallback(
@@ -213,39 +333,18 @@ export function CartProvider({ children }) {
 
       if (currentQty <= 0) return
 
-      if (
-        !cartService.isBackendEnabled() ||
-        !isCartRole ||
-        !current?.cartItemId
-      ) {
-        const newQty = currentQty - 1
-        dispatch({ type: 'UPDATE_LOCAL', id, qty: newQty })
-        return
-      }
+      const nextQty = currentQty - 1
 
-      dispatch({ type: 'SET_SYNCING', value: true })
-
-      try {
-        const newQty = currentQty - 1
-
-        // Make backend request and always refetch to ensure frontend matches backend
-        if (newQty <= 0) {
-          await cartService.removeItem(current)
-        } else {
-          await cartService.updateItem(current, newQty)
-        }
-
-        // Refetch cart from backend after mutation to ensure state is in sync
-        const updatedCart = await cartService.getCart()
-        dispatch({ type: 'SET_CART', items: updatedCart?.items ?? [] })
-      } catch (error) {
-        toast.error(error.message || 'Failed to remove item from cart.')
-        throw error
-      } finally {
-        dispatch({ type: 'SET_SYNCING', value: false })
-      }
+      return runCartMutation(
+        () =>
+          nextQty <= 0
+            ? cartService.removeItem(current)
+            : cartService.updateItem(current, nextQty),
+        () => dispatch({ type: 'UPDATE_LOCAL', id, qty: nextQty }),
+        'Failed to remove item from cart.',
+      )
     },
-    [isCartRole]
+    [runCartMutation],
   )
 
   const updateQty = useCallback(
@@ -262,56 +361,58 @@ export function CartProvider({ children }) {
       }
 
       if (isIncrease && !isOrderingAllowed) {
-        toast.error(orderBlockedMessage || 'Canteen is not accepting new orders right now.')
+        toast.error(
+          orderBlockedMessage || 'Canteen is not accepting new orders right now.',
+        )
         return
       }
 
-      if (
-        !cartService.isBackendEnabled() ||
-        !isCartRole ||
-        !current?.cartItemId
-      ) {
-        dispatch({ type: 'UPDATE_LOCAL', id, qty })
-        return
-      }
-
-      dispatch({ type: 'SET_SYNCING', value: true })
-
-      try {
-        // Make backend request
-        if (qty <= 0) {
-          await cartService.removeItem(current)
-        } else {
-          await cartService.updateItem(current, qty)
-        }
-
-        // Refetch cart from backend after mutation to ensure state is in sync
-        const updatedCart = await cartService.getCart()
-        dispatch({ type: 'SET_CART', items: updatedCart?.items ?? [] })
-      } catch (error) {
-        toast.error(error.message || 'Failed to update cart.')
-        throw error
-      } finally {
-        dispatch({ type: 'SET_SYNCING', value: false })
-      }
+      return runCartMutation(
+        () =>
+          qty <= 0
+            ? cartService.removeItem(current)
+            : cartService.updateItem(current, qty),
+        () => dispatch({ type: 'UPDATE_LOCAL', id, qty }),
+        'Failed to update cart.',
+      )
     },
-    [canteenLoading, isCartRole, isOrderingAllowed, orderBlockedMessage]
+    [
+      canteenLoading,
+      isOrderingAllowed,
+      orderBlockedMessage,
+      runCartMutation,
+    ],
   )
 
   const clearCart = useCallback(async () => {
-    dispatch({ type: 'CLEAR' })
-    localStorage.removeItem(LS_KEYS.CART)
-  }, [])
+    const currentItems = itemsRef.current
+
+    if (!currentItems.length) {
+      dispatch({ type: 'CLEAR' })
+      dispatch({
+        type: 'SET_STATUS',
+        value: { outOfSync: false },
+      })
+      clearPersistedLocalCart()
+      return { id: null, items: [], total: 0, count: 0 }
+    }
+
+    return runCartMutation(
+      () => cartService.clearCart(currentItems),
+      () => dispatch({ type: 'CLEAR' }),
+      'Failed to clear cart.',
+    )
+  }, [clearPersistedLocalCart, runCartMutation])
 
   const total = state.items.reduce(
     (sum, item) =>
       sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
-    0
+    0,
   )
 
   const count = state.items.reduce(
     (sum, item) => sum + (item.qty || item.quantity || 0),
-    0
+    0,
   )
 
   return (
@@ -322,11 +423,14 @@ export function CartProvider({ children }) {
         count,
         loading: state.loading,
         syncing: state.syncing,
+        dirty: state.dirty,
+        outOfSync: state.outOfSync,
         addItem,
         removeItem,
         updateQty,
         clearCart,
         refreshCart: syncFromBackend,
+        replaceCartFromServer: applyCart,
       }}
     >
       {children}

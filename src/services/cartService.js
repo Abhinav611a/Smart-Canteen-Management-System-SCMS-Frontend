@@ -43,8 +43,12 @@ function normaliseCart(raw) {
   }
 }
 
+function getAuthStorage() {
+  return sessionStorage
+}
+
 function hasToken() {
-  return Boolean(localStorage.getItem(LS_KEYS.JWT))
+  return Boolean(getAuthStorage().getItem(LS_KEYS.JWT))
 }
 
 function isCartMissingError(error) {
@@ -63,6 +67,69 @@ function isCartMissingError(error) {
     message.includes('cart not found') ||
     message.includes('cart is empty') ||
     message.includes('empty cart')
+  )
+}
+
+export function createCartSnapshot(cartLike = []) {
+  const items = Array.isArray(cartLike) ? cartLike : cartLike?.items ?? []
+
+  return items
+    .map(normaliseCartItem)
+    .map((item) => ({
+      cartItemId: String(item.cartItemId ?? ''),
+      foodItemId: String(item.foodItemId ?? item.id ?? ''),
+      qty: Number(item.qty ?? item.quantity ?? 0),
+      price: Number(item.price ?? 0),
+    }))
+    .sort((a, b) => {
+      const aKey = `${a.foodItemId}:${a.cartItemId}`
+      const bKey = `${b.foodItemId}:${b.cartItemId}`
+      return aKey.localeCompare(bKey)
+    })
+}
+
+export function cartSnapshotsMatch(a, b) {
+  const left = createCartSnapshot(a)
+  const right = createCartSnapshot(b)
+
+  if (left.length !== right.length) return false
+
+  return left.every((item, index) => {
+    const other = right[index]
+
+    return (
+      item.cartItemId === other.cartItemId &&
+      item.foodItemId === other.foodItemId &&
+      item.qty === other.qty &&
+      item.price === other.price
+    )
+  })
+}
+
+export function isCartMismatchError(error) {
+  const status = error?.response?.status
+  const message = String(
+    error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      error?.message ||
+      '',
+  ).toLowerCase()
+
+  return (
+    status === 409 ||
+    (status === 400 &&
+      message.includes('cart') &&
+      (message.includes('mismatch') ||
+        message.includes('match') ||
+        message.includes('stale') ||
+        message.includes('changed') ||
+        message.includes('updated'))) ||
+    message.includes('cart mismatch') ||
+    message.includes('does not match') ||
+    message.includes('latest server state') ||
+    message.includes('stale cart') ||
+    message.includes('cart has changed') ||
+    message.includes('cart was updated')
   )
 }
 
@@ -104,13 +171,26 @@ export const cartService = {
   },
 
   async clearCart(items = []) {
-    await Promise.all(
+    const results = await Promise.allSettled(
       items.map((item) => {
         const cartItemId = item.cartItemId ?? item.id
-        return api.delete(ENDPOINTS.CART_ITEM(cartItemId)).catch(() => null)
+        return api.delete(ENDPOINTS.CART_ITEM(cartItemId))
       }),
     )
-    return { items: [], total: 0, count: 0 }
+
+    const cart = await this.getCart()
+    const failed = results.find((result) => result.status === 'rejected')
+
+    if (failed && cart.items.length > 0) {
+      const reason = failed.reason
+      const error =
+        reason instanceof Error ? reason : new Error('Failed to clear cart.')
+
+      error.latestCart = cart
+      throw error
+    }
+
+    return cart
   },
 
   async checkout(data = {}) {

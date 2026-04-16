@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useCart } from '@/context/CartContext'
 import { useNotifications } from '@/context/NotificationContext'
 import { useCanteen } from '@/context/CanteenContext'
-import { cartService } from '@/services/cartService'
+import {
+  cartService,
+  cartSnapshotsMatch,
+  isCartMismatchError,
+} from '@/services/cartService'
 import { formatCurrency } from '@/utils/helpers'
 
 const PAYMENT_METHODS = [
@@ -13,6 +17,9 @@ const PAYMENT_METHODS = [
   { value: 'CARD', label: 'Card', icon: '💳' },
   { value: 'UPI', label: 'UPI', icon: '📱' },
 ]
+
+const SERVER_SYNC_MESSAGE =
+  'Your cart was updated to match the latest server state. Please review and place your order again.'
 
 export default function StudentCart() {
   const navigate = useNavigate()
@@ -25,30 +32,54 @@ export default function StudentCart() {
     orderNoticeDescription,
   } = useCanteen()
 
-  const { items, total, count, updateQty, removeItem, clearCart, syncing, refreshCart } =
-    useCart()
+  const {
+    items,
+    total,
+    count,
+    loading: cartLoading,
+    syncing,
+    dirty,
+    outOfSync,
+    updateQty,
+    removeItem,
+    clearCart,
+    refreshCart,
+    replaceCartFromServer,
+  } = useCart()
   const { addNotification } = useNotifications()
 
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
-  const [backendSynced, setBackendSynced] = useState(false)
 
-  // Sync cart with backend when page loads to ensure UI matches backend
   useEffect(() => {
     const syncOnMount = async () => {
       try {
-        await refreshCart()
-        setBackendSynced(true)
+        await refreshCart({ silent: true })
       } catch (error) {
         console.error('Failed to sync cart on page load:', error)
-        toast.error('Failed to sync cart. Some items may be stale.')
-        setBackendSynced(false)
       }
     }
 
     syncOnMount()
   }, [refreshCart])
+
+  const cartBusy = cartLoading || syncing || dirty || placing
+  const checkoutBlocked = cartBusy || outOfSync
+
+  const syncUiToServerCart = async ({
+    latestCart = null,
+    message = SERVER_SYNC_MESSAGE,
+  } = {}) => {
+    try {
+      const cart = latestCart ?? (await refreshCart({ silent: true }))
+      replaceCartFromServer(cart)
+    } catch (syncError) {
+      console.error('Failed to refresh latest cart state:', syncError)
+    }
+
+    toast.error(message)
+  }
 
   const handleDecreaseQty = async (item) => {
     try {
@@ -75,6 +106,15 @@ export default function StudentCart() {
   }
 
   const handlePlaceOrder = async () => {
+    if (checkoutBlocked) {
+      toast.error(
+        outOfSync
+          ? 'Your cart needs to be synced with the server before checkout.'
+          : 'Your cart is still syncing. Please wait a moment.',
+      )
+      return
+    }
+
     if (canteenLoading) {
       toast.error('Checking canteen status. Please wait a moment.')
       return
@@ -82,7 +122,7 @@ export default function StudentCart() {
 
     if (!isOrderingAllowed) {
       toast.error(
-        orderBlockedMessage || 'Canteen is not accepting new orders right now.'
+        orderBlockedMessage || 'Canteen is not accepting new orders right now.',
       )
       return
     }
@@ -95,34 +135,18 @@ export default function StudentCart() {
     setPlacing(true)
 
     try {
-      // Always ensure backend cart is in sync before checkout
-      const backendCart = await cartService.getCart()
+      const backendCart = await refreshCart({ apply: false, silent: true })
 
-      // Strict validation: both frontend and backend must have items
-      if (!backendCart?.items?.length) {
-        toast.error(
-          'Cart is empty on the server. This may be a sync issue. Please refresh and try again.'
-        )
-        // Clear stale frontend items if backend is empty
-        await clearCart()
+      if (!backendCart?.items?.length || !cartSnapshotsMatch(items, backendCart)) {
+        await syncUiToServerCart({ latestCart: backendCart })
         return
       }
 
-      // Verify item counts match to detect sync issues
-      const frontendCount = items.reduce((sum, item) => sum + (item.qty || 0), 0)
-      const backendCount = backendCart.items.reduce((sum, item) => sum + (item.qty || 0), 0)
-
-      if (frontendCount !== backendCount) {
-        toast.error(
-          'Cart items on server do not match the UI. Please refresh your cart.'
-        )
-        // Sync frontend with backend items
-        return
-      }
+      replaceCartFromServer(backendCart)
 
       const order = await cartService.checkout({ paymentMethod })
 
-      await clearCart()
+      await refreshCart({ silent: true })
 
       setPlaced({
         ...order,
@@ -151,16 +175,13 @@ export default function StudentCart() {
       const message = String(backendMessage || '').toLowerCase()
 
       if (
+        isCartMismatchError(error) ||
         error?.code === 'CART_EMPTY' ||
         message.includes('cart not found') ||
         message.includes('cart is empty') ||
         message.includes('empty cart')
       ) {
-        toast.error(
-          'Cart not found on server. Please add items again from the menu.'
-        )
-        // Clear stale items
-        await clearCart()
+        await syncUiToServerCart()
       } else if (status === 400) {
         toast.error(backendMessage || 'Checkout request is invalid.')
       } else {
@@ -303,16 +324,17 @@ export default function StudentCart() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => refreshCart()}
-            disabled={syncing}
+            disabled={cartBusy}
             className="rounded-full px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-gray-800"
             title="Sync cart with server"
             type="button"
           >
-            {syncing ? '⟳ Syncing…' : '⟳ Sync'}
+            {cartBusy ? '⟳ Syncing…' : '⟳ Sync'}
           </button>
           <button
             onClick={() => clearCart()}
-            className="text-xs font-medium text-red-400 transition-colors hover:text-red-500"
+            disabled={cartBusy}
+            className="text-xs font-medium text-red-400 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
           >
             Clear all
@@ -331,13 +353,14 @@ export default function StudentCart() {
         </div>
       )}
 
-      {!backendSynced && items.length > 0 && (
+      {outOfSync && items.length > 0 && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm shadow-sm dark:border-red-500/20 dark:bg-red-500/10">
           <p className="font-semibold text-red-900 dark:text-red-200">
             Cart Sync Warning
           </p>
           <p className="mt-1 text-red-700 dark:text-red-300">
-            Your cart may not be fully synced with the server. Click the {`"`}Sync{`"`} button above to refresh.
+            Your cart could not be confirmed with the server. Click the "Sync"
+            button above before placing your order.
           </p>
         </div>
       )}
@@ -369,7 +392,8 @@ export default function StudentCart() {
                 <button
                   onClick={() => handleDecreaseQty(item)}
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 dark:bg-gray-800"
+                  disabled={cartBusy}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800"
                 >
                   −
                 </button>
@@ -381,7 +405,7 @@ export default function StudentCart() {
                 <button
                   onClick={() => handleIncreaseQty(item)}
                   type="button"
-                  disabled={!isOrderingAllowed}
+                  disabled={cartBusy || !isOrderingAllowed}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800"
                 >
                   +
@@ -395,7 +419,8 @@ export default function StudentCart() {
               <button
                 onClick={() => handleRemoveItem(item)}
                 type="button"
-                className="ml-1 shrink-0 text-sm text-slate-300 transition-colors hover:text-red-500 dark:text-gray-600"
+                disabled={cartBusy}
+                className="ml-1 shrink-0 text-sm text-slate-300 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-600"
                 title="Remove item"
               >
                 ✕
@@ -445,7 +470,8 @@ export default function StudentCart() {
                   key={method.value}
                   type="button"
                   onClick={() => setPaymentMethod(method.value)}
-                  className={`flex flex-col items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all ${
+                  disabled={cartBusy}
+                  className={`flex flex-col items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                     selected
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400'
                       : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600'
@@ -462,16 +488,16 @@ export default function StudentCart() {
         <button
           type="button"
           onClick={handlePlaceOrder}
-          disabled={placing || syncing || !isOrderingAllowed}
+          disabled={checkoutBlocked || !isOrderingAllowed}
           className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {canteenLoading
             ? 'Checking Status...'
             : !isOrderingAllowed
-            ? checkoutActionLabel
-            : placing
-              ? 'Placing Order…'
-              : `Place Order (${paymentMethod})`}
+              ? checkoutActionLabel
+              : placing
+                ? 'Validating Cart...'
+                : `Place Order (${paymentMethod})`}
         </button>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-500">
