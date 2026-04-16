@@ -3,9 +3,11 @@ import toast from 'react-hot-toast'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { extractQrCodeValue } from '@/services/orders'
 
 const AUTO_CLOSE_DELAY_MS = 1500
 const CAMERA_HANDOFF_DELAY_MS = 150
+const SCAN_DEBOUNCE_MS = 1500
 const HTML5_QRCODE_SCRIPT_ID = 'html5-qrcode-script'
 const HTML5_QRCODE_SCRIPT_URL = 'https://unpkg.com/html5-qrcode'
 const CAMERA_STARTUP_PHASES = [
@@ -32,12 +34,37 @@ const delay = (ms) =>
   })
 
 function getVerifyErrorMessage(error) {
-  return (
+  const message =
     error?.response?.data?.error ||
     error?.response?.data?.message ||
     error?.message ||
     'Unable to verify this QR code right now.'
-  )
+  const normalizedMessage = String(message || '').toLowerCase()
+
+  if (
+    normalizedMessage.includes('already completed') ||
+    normalizedMessage.includes('already collected') ||
+    normalizedMessage.includes('already verified')
+  ) {
+    return 'This order has already been collected.'
+  }
+
+  if (normalizedMessage.includes('expired')) {
+    return 'This QR code has expired. Please refresh the order QR and try again.'
+  }
+
+  if (
+    normalizedMessage.includes('tampered') ||
+    normalizedMessage.includes('invalid qr')
+  ) {
+    return 'Invalid QR code. Please scan the latest order QR.'
+  }
+
+  return message
+}
+
+function isValidOrderQrCode(code = '') {
+  return String(code || '').includes('|')
 }
 
 function createCameraIssue(type, overrides = {}) {
@@ -508,6 +535,9 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
   const streamRef = useRef(null)
   const closeTimerRef = useRef(0)
   const processingRef = useRef(false)
+  const lastScanValueRef = useRef('')
+  const lastScanAtRef = useRef(0)
+  const lockedQrValueRef = useRef('')
 
   const [phase, setPhase] = useState('idle')
   const [message, setMessage] = useState('')
@@ -520,6 +550,8 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
   const [manualEntryOpen, setManualEntryOpen] = useState(false)
   const [scannerDiagnostics, setScannerDiagnostics] = useState(null)
   const [decoderName, setDecoderName] = useState('native-barcode-detector')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [lockedQrValue, setLockedQrValue] = useState('')
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
@@ -541,6 +573,15 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
     setCameraIssue(null)
     setScannerDiagnostics(null)
     setDecoderName('native-barcode-detector')
+  }, [])
+
+  const resetScanTracking = useCallback(() => {
+    processingRef.current = false
+    lastScanValueRef.current = ''
+    lastScanAtRef.current = 0
+    lockedQrValueRef.current = ''
+    setLockedQrValue('')
+    setIsProcessing(false)
   }, [])
 
   const stopScanner = useCallback(async () => {
@@ -591,30 +632,71 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
 
   const handleRetryCamera = useCallback(async () => {
     clearCloseTimer()
-    processingRef.current = false
+    resetScanTracking()
     await stopScanner()
     resetCameraState()
     setManualCode('')
     setManualEntryOpen(false)
     setPhase('idle')
     setStartAttempt((value) => value + 1)
-  }, [clearCloseTimer, resetCameraState, stopScanner])
+  }, [clearCloseTimer, resetCameraState, resetScanTracking, stopScanner])
 
   const handleDetectedCode = useCallback(
     async (code) => {
-      const submittedCode = typeof code === 'string' ? code.trim() : ''
+      const submittedCode = extractQrCodeValue(code)
       if (!submittedCode || processingRef.current) return
 
+      if (
+        lockedQrValueRef.current &&
+        lockedQrValueRef.current !== submittedCode
+      ) {
+        return
+      }
+
+      const now = Date.now()
+      const isDuplicateScan =
+        lastScanValueRef.current === submittedCode &&
+        now - lastScanAtRef.current < SCAN_DEBOUNCE_MS
+
+      if (isDuplicateScan) return
+
+      lastScanValueRef.current = submittedCode
+      lastScanAtRef.current = now
+      lockedQrValueRef.current = submittedCode
+      setLockedQrValue(submittedCode)
+
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(35)
+      }
+
       processingRef.current = true
-      await stopScanner()
+      setIsProcessing(true)
+
       setPhase('verifying')
-      setMessage('Verifying scanned order...')
+      setMessage('QR detected. Verifying order...')
       setOrderLabel('')
       setErrorSource('')
       setCameraIssue(null)
 
+      if (!isValidOrderQrCode(submittedCode)) {
+        const invalidMessage =
+          'Invalid QR code format. Please scan the latest order QR.'
+
+        await stopScanner()
+        toast.error(invalidMessage, { id: 'qr-format-error' })
+        setOrderLabel('')
+        setErrorSource('verify')
+        setCameraIssue(null)
+        setMessage(invalidMessage)
+        setPhase('error')
+        scheduleAutoClose()
+        resetScanTracking()
+        return
+      }
+
       try {
         const result = await onVerify(submittedCode)
+        await stopScanner()
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate([60, 40, 60])
@@ -625,6 +707,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         setPhase('success')
         scheduleAutoClose()
       } catch (error) {
+        await stopScanner()
         const errorMessage = getVerifyErrorMessage(error)
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -638,10 +721,10 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         setPhase('error')
         scheduleAutoClose()
       } finally {
-        processingRef.current = false
+        resetScanTracking()
       }
     },
-    [onVerify, scheduleAutoClose, stopScanner]
+    [onVerify, resetScanTracking, scheduleAutoClose, stopScanner]
   )
 
   const handleManualSubmit = useCallback(
@@ -655,7 +738,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
   useEffect(() => {
     if (!open) {
       clearCloseTimer()
-      processingRef.current = false
+      resetScanTracking()
       setPhase('idle')
       setManualCode('')
       setManualEntryOpen(false)
@@ -668,6 +751,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
 
     const startScanner = async () => {
       resetCameraState()
+      resetScanTracking()
       setManualCode('')
       setManualEntryOpen(false)
       setPhase('checking-support')
@@ -803,8 +887,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         await liveScanner.start(
           { facingMode: 'environment' },
           {
-            fps: 10,
-            qrbox: { width: 240, height: 240 },
+            fps: 12,
             aspectRatio: 4 / 3,
             disableFlip: false,
           },
@@ -823,7 +906,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
 
         html5QrcodeRunningRef.current = true
         setPhase('scanning')
-        setMessage('Align the QR code inside the frame to verify pickup.')
+        setMessage('Point the camera at the QR code anywhere in view to verify pickup.')
       } catch (error) {
         if (cancelled) return
         setCameraFailure(
@@ -840,12 +923,16 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
       cancelled = true
       clearCloseTimer()
       processingRef.current = false
+      lastScanValueRef.current = ''
+      lastScanAtRef.current = 0
+      lockedQrValueRef.current = ''
       void stopScanner()
     }
   }, [
     clearCloseTimer,
     open,
     resetCameraState,
+    resetScanTracking,
     setCameraFailure,
     startAttempt,
     stopScanner,
@@ -854,8 +941,10 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
 
   const isStartingCamera = CAMERA_STARTUP_PHASES.includes(phase)
   const isPreparingCamera = phase === 'idle' || isStartingCamera
-  const isVerifying = phase === 'verifying'
+  const isVerifying = phase === 'verifying' || isProcessing
   const isScanning = phase === 'scanning'
+  const isTrackingLocked = Boolean(lockedQrValue)
+  const isLivePreviewVisible = isScanning || isVerifying || isTrackingLocked
   const isSuccess = phase === 'success'
   const isError = phase === 'error'
   const isVerifyError = isError && errorSource === 'verify'
@@ -942,18 +1031,59 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
     >
       <div className="space-y-4">
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-inner dark:border-gray-800">
-          <div className="relative aspect-[4/3] w-full">
+          <div className="relative aspect-[4/3] w-full overflow-hidden">
             <div
               id={scannerContainerIdRef.current}
               ref={scannerContainerRef}
-              className={`h-full w-full bg-slate-950 ${isScanning ? 'opacity-100' : 'opacity-25'} [&>*]:h-full [&>*]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover`}
+              className={`h-full w-full bg-slate-950 transition-all duration-300 ease-out ${
+                isLivePreviewVisible ? 'opacity-100' : 'opacity-25'
+              } ${isTrackingLocked ? 'scale-[1.04]' : 'scale-100'} [&>*]:h-full [&>*]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover`}
             />
 
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-56 w-56 max-w-[70%] rounded-[2rem] border-2 border-white/80 shadow-[0_0_0_999px_rgba(2,6,23,0.45)]" />
+            <div
+              className={`pointer-events-none absolute inset-4 rounded-[2rem] border transition-all duration-300 sm:inset-6 ${
+                isTrackingLocked
+                  ? 'border-emerald-300/70 shadow-[0_0_40px_rgba(16,185,129,0.3)]'
+                  : 'border-white/15'
+              }`}
+            >
+              <div
+                className={`absolute left-0 top-0 h-12 w-12 rounded-tl-[2rem] border-l-4 border-t-4 transition-colors duration-300 ${
+                  isTrackingLocked
+                    ? 'border-emerald-300 animate-pulse'
+                    : 'border-white/85'
+                }`}
+              />
+              <div
+                className={`absolute right-0 top-0 h-12 w-12 rounded-tr-[2rem] border-r-4 border-t-4 transition-colors duration-300 ${
+                  isTrackingLocked
+                    ? 'border-emerald-300 animate-pulse'
+                    : 'border-white/85'
+                }`}
+              />
+              <div
+                className={`absolute bottom-0 left-0 h-12 w-12 rounded-bl-[2rem] border-b-4 border-l-4 transition-colors duration-300 ${
+                  isTrackingLocked
+                    ? 'border-emerald-300 animate-pulse'
+                    : 'border-white/85'
+                }`}
+              />
+              <div
+                className={`absolute bottom-0 right-0 h-12 w-12 rounded-br-[2rem] border-b-4 border-r-4 transition-colors duration-300 ${
+                  isTrackingLocked
+                    ? 'border-emerald-300 animate-pulse'
+                    : 'border-white/85'
+                }`}
+              />
             </div>
 
-            {!isScanning && (
+            {isTrackingLocked && (
+              <div className="pointer-events-none absolute left-6 top-6 rounded-full bg-emerald-500/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-lg">
+                QR detected
+              </div>
+            )}
+
+            {!isLivePreviewVisible && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-white">
                 <div className="space-y-3">
                   <StatusIcon
@@ -1004,7 +1134,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         {phase === 'verifying' && (
           <div className="flex items-center justify-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            Verifying scanned order...
+            {message || 'Verifying scanned order...'}
           </div>
         )}
 
