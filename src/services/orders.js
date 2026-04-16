@@ -7,6 +7,21 @@ export function canAccessInvoice(order) {
   return Boolean(order.id || order.orderNumber)
 }
 
+export function extractQrCodeValue(scannedValue = '') {
+  const raw = String(scannedValue || '').trim()
+  if (!raw) return ''
+
+  try {
+    const url = new URL(raw)
+    const codeParam = url.searchParams.get('code')
+    if (codeParam) return codeParam.trim()
+  } catch {
+    // Not a URL; use the raw scanned value as-is.
+  }
+
+  return raw
+}
+
 function normaliseOrderItem(item) {
   const food = item?.foodItem ?? item?.menuItem ?? item
   const parsedQuantity = Number(item?.quantity ?? item?.qty)
@@ -124,8 +139,10 @@ export const ordersService = {
   },
 
   async verifyOrder(code) {
+    const normalizedCode = extractQrCodeValue(code)
+
     return api.get(ENDPOINTS.ORDER_VERIFY, {
-      params: { code },
+      params: { code: normalizedCode },
     })
   },
 
