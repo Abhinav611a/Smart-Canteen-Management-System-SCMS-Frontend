@@ -2,22 +2,34 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 
 const AUTO_CLOSE_DELAY_MS = 1500
-const SCAN_THROTTLE_MS = 250
+const CAMERA_HANDOFF_DELAY_MS = 150
+const HTML5_QRCODE_SCRIPT_ID = 'html5-qrcode-script'
+const HTML5_QRCODE_SCRIPT_URL = 'https://unpkg.com/html5-qrcode'
 const CAMERA_STARTUP_PHASES = [
   'checking-support',
+  'loading-decoder',
   'checking-permission',
   'prompting-permission',
   'requesting-camera',
+  'starting-live-scan',
 ]
 const CAMERA_HELP_ITEMS = [
   'Allow camera access from your browser site settings for this page.',
   'Check the lock or site icon near the address bar and enable Camera access.',
   'Close other apps or tabs using the camera, such as Zoom, Meet, or Teams.',
-  'Try Chrome, Edge, or a mobile device if this browser limits in-app scanning.',
-  'Use an external scanner if your setup provides one.',
+  'Try Chrome, Edge, Safari, or a mobile device if this desktop browser is restricted.',
+  'Use manual code entry or an external scanner if your setup provides one.',
 ]
+
+let html5QrcodeLoadPromise = null
+
+const delay = (ms) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 
 function getVerifyErrorMessage(error) {
   return (
@@ -34,11 +46,6 @@ function createCameraIssue(type, overrides = {}) {
       title: 'Camera not supported',
       message:
         'This browser does not support the camera APIs required for in-app QR scanning.',
-    },
-    'scanner-unsupported': {
-      title: 'Live QR scanning not supported',
-      message:
-        'Camera access is available, but this browser cannot run in-app QR scanning here.',
     },
     'permission-denied': {
       title: 'Camera permission blocked',
@@ -62,6 +69,16 @@ function createCameraIssue(type, overrides = {}) {
       title: 'Camera blocked by browser security',
       message:
         'Camera access is blocked by browser or page security settings. Use HTTPS or localhost and allow camera access.',
+    },
+    'decoder-load-failed': {
+      title: 'Live QR scanner unavailable',
+      message:
+        'The cross-browser QR scanning library could not be loaded. You can still enter the code manually or use an external scanner.',
+    },
+    'decoder-init-failed': {
+      title: 'Unable to start live QR scanning',
+      message:
+        'The cross-browser QR scanner could not initialize the camera feed. Please try again or enter the code manually.',
     },
     'init-failed': {
       title: 'Unable to initialize camera',
@@ -116,53 +133,176 @@ async function getCameraPermissionState() {
   }
 }
 
-async function isQrCodeFormatSupported(BarcodeDetectorCtor) {
+async function getNativeBarcodeFormats() {
   if (
-    !BarcodeDetectorCtor ||
-    typeof BarcodeDetectorCtor.getSupportedFormats !== 'function'
+    typeof window === 'undefined' ||
+    typeof window.BarcodeDetector === 'undefined' ||
+    typeof window.BarcodeDetector.getSupportedFormats !== 'function'
   ) {
-    return true
+    return null
   }
 
   try {
-    const supportedFormats = await BarcodeDetectorCtor.getSupportedFormats()
+    const formats = await window.BarcodeDetector.getSupportedFormats()
+    return Array.isArray(formats) ? formats : null
+  } catch {
+    return null
+  }
+}
 
-    if (!Array.isArray(supportedFormats) || supportedFormats.length === 0) {
-      return true
+async function getVideoInputCount() {
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.enumerateDevices !== 'function'
+  ) {
+    return null
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    return devices.filter((device) => device.kind === 'videoinput').length
+  } catch {
+    return null
+  }
+}
+
+async function collectScannerDiagnostics() {
+  const support = checkCameraSupport()
+  const [permissionState, nativeBarcodeFormats, videoInputCount] =
+    await Promise.all([
+      getCameraPermissionState(),
+      getNativeBarcodeFormats(),
+      getVideoInputCount(),
+    ])
+
+  return {
+    hasMediaDevices: support.hasMediaDevices,
+    hasGetUserMedia: support.hasGetUserMedia,
+    hasBarcodeDetector: support.hasBarcodeDetector,
+    isSecureContext: support.isSecureContext,
+    videoInputCount,
+    permissionState,
+    nativeBarcodeFormats,
+    nativeQrSupported: Array.isArray(nativeBarcodeFormats)
+      ? nativeBarcodeFormats.includes('qr_code')
+      : null,
+  }
+}
+
+function getHtml5QrcodeGlobals() {
+  if (typeof window === 'undefined') return null
+  const Html5Qrcode = window.Html5Qrcode
+  const Html5QrcodeSupportedFormats = window.Html5QrcodeSupportedFormats
+
+  if (
+    typeof Html5Qrcode === 'function' &&
+    Html5QrcodeSupportedFormats &&
+    typeof Html5QrcodeSupportedFormats === 'object'
+  ) {
+    return { Html5Qrcode, Html5QrcodeSupportedFormats }
+  }
+
+  return null
+}
+
+function loadHtml5QrcodeLibrary() {
+  const existingApi = getHtml5QrcodeGlobals()
+  if (existingApi) return Promise.resolve(existingApi)
+  if (html5QrcodeLoadPromise) return html5QrcodeLoadPromise
+
+  html5QrcodeLoadPromise = new Promise((resolve, reject) => {
+    if (typeof document === 'undefined') {
+      reject(createCameraIssue('decoder-load-failed'))
+      return
     }
 
-    return supportedFormats.includes('qr_code')
-  } catch {
-    return true
-  }
+    const handleReady = () => {
+      const api = getHtml5QrcodeGlobals()
+      if (api) {
+        resolve(api)
+        return
+      }
+      reject(createCameraIssue('decoder-load-failed'))
+    }
+
+    const handleError = () => {
+      reject(createCameraIssue('decoder-load-failed'))
+    }
+
+    const existingScript = document.getElementById(HTML5_QRCODE_SCRIPT_ID)
+    if (existingScript) {
+      const api = getHtml5QrcodeGlobals()
+      if (api) {
+        resolve(api)
+        return
+      }
+
+      existingScript.addEventListener('load', handleReady, { once: true })
+      existingScript.addEventListener('error', handleError, { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = HTML5_QRCODE_SCRIPT_ID
+    script.src = HTML5_QRCODE_SCRIPT_URL
+    script.async = true
+    script.onload = handleReady
+    script.onerror = handleError
+    document.head.appendChild(script)
+  }).catch((error) => {
+    html5QrcodeLoadPromise = null
+    throw error
+  })
+
+  return html5QrcodeLoadPromise
 }
 
 function isConstraintError(error) {
   const name = String(error?.name || '')
+  const text = `${name} ${String(error?.message || error || '')}`.toLowerCase()
+
   return (
     name === 'OverconstrainedError' ||
-    name === 'ConstraintNotSatisfiedError'
+    name === 'ConstraintNotSatisfiedError' ||
+    text.includes('overconstrainederror') ||
+    text.includes('constraintnotsatisfiederror')
   )
 }
 
 function classifyCameraError(error, { permissionState = 'unknown' } = {}) {
   const name = String(error?.name || '')
+  const text = `${name} ${String(error?.message || error || '')}`.toLowerCase()
 
-  if (name === 'NotAllowedError') {
+  if (
+    name === 'NotAllowedError' ||
+    text.includes('notallowederror') ||
+    text.includes('permission denied') ||
+    text.includes('permission blocked')
+  ) {
     return createCameraIssue('permission-denied', {
       permissionState,
       originalError: error,
     })
   }
 
-  if (name === 'SecurityError') {
+  if (
+    name === 'SecurityError' ||
+    text.includes('securityerror') ||
+    text.includes('secure origin')
+  ) {
     return createCameraIssue('security-blocked', {
       permissionState,
       originalError: error,
     })
   }
 
-  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+  if (
+    name === 'NotFoundError' ||
+    name === 'DevicesNotFoundError' ||
+    text.includes('notfounderror') ||
+    text.includes('requested device not found')
+  ) {
     return createCameraIssue('no-camera', {
       permissionState,
       originalError: error,
@@ -172,7 +312,11 @@ function classifyCameraError(error, { permissionState = 'unknown' } = {}) {
   if (
     name === 'NotReadableError' ||
     name === 'TrackStartError' ||
-    name === 'AbortError'
+    name === 'AbortError' ||
+    text.includes('notreadableerror') ||
+    text.includes('trackstarterror') ||
+    text.includes('could not start video source') ||
+    text.includes('device in use')
   ) {
     return createCameraIssue('camera-busy', {
       permissionState,
@@ -193,12 +337,23 @@ function classifyCameraError(error, { permissionState = 'unknown' } = {}) {
   })
 }
 
+function classifyLiveScannerError(error, context = {}) {
+  const issue = classifyCameraError(error, context)
+
+  if (issue.type === 'init-failed') {
+    return createCameraIssue('decoder-init-failed', {
+      ...context,
+      originalError: error,
+    })
+  }
+
+  return issue
+}
+
 async function requestCameraAccess({ permissionState = 'unknown' } = {}) {
   const preferredConstraints = {
     audio: false,
-    video: {
-      facingMode: { ideal: 'environment' },
-    },
+    video: { facingMode: { ideal: 'environment' } },
   }
 
   try {
@@ -243,9 +398,7 @@ function getOrderLabel(result) {
     result?.data?.orderId ??
     result?.data?.order?.id
 
-  if (id != null && String(id).trim()) {
-    return `Order #${id}`
-  }
+  if (id != null && String(id).trim()) return `Order #${id}`
 
   const orderNumber =
     result?.orderNumber ??
@@ -263,60 +416,67 @@ function stopStream(stream) {
     try {
       track.stop()
     } catch {
-      // Ignore track shutdown errors during modal cleanup.
+      // Ignore cleanup errors while closing camera streams.
     }
   })
 }
 
-function SpinnerStatusIcon() {
-  return (
-    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-      <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/80 border-t-transparent" />
-    </span>
-  )
+function formatDiagnosticValue(value) {
+  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'None reported'
+  if (value == null) return 'Unknown'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  return String(value)
 }
 
-function SuccessStatusIcon() {
-  return (
-    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.25"
-        className="h-8 w-8"
-        aria-hidden="true"
-      >
-        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  )
-}
+function StatusIcon({ kind }) {
+  if (kind === 'spinner') {
+    return (
+      <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/80 border-t-transparent" />
+      </span>
+    )
+  }
 
-function ErrorStatusIcon() {
-  return (
-    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20 text-red-200">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.25"
-        className="h-8 w-8"
-        aria-hidden="true"
-      >
-        <path d="M12 8v5" strokeLinecap="round" />
-        <circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none" />
-        <path
-          d="M10.3 3.84 2.82 17a2 2 0 0 0 1.74 3h14.88a2 2 0 0 0 1.74-3L13.7 3.84a2 2 0 0 0-3.48 0Z"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  )
-}
+  if (kind === 'success') {
+    return (
+      <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.25"
+          className="h-8 w-8"
+          aria-hidden="true"
+        >
+          <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    )
+  }
 
-function CameraStatusIcon() {
+  if (kind === 'error') {
+    return (
+      <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20 text-red-200">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.25"
+          className="h-8 w-8"
+          aria-hidden="true"
+        >
+          <path d="M12 8v5" strokeLinecap="round" />
+          <circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none" />
+          <path
+            d="M10.3 3.84 2.82 17a2 2 0 0 0 1.74 3h14.88a2 2 0 0 0 1.74-3L13.7 3.84a2 2 0 0 0-3.48 0Z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    )
+  }
+
   return (
     <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white">
       <svg
@@ -339,11 +499,13 @@ function CameraStatusIcon() {
 }
 
 export default function QRScannerModal({ open, onClose, onVerify }) {
-  const videoRef = useRef(null)
+  const scannerContainerRef = useRef(null)
+  const scannerContainerIdRef = useRef(
+    `manager-qr-scanner-${Math.random().toString(36).slice(2, 10)}`
+  )
+  const html5QrcodeRef = useRef(null)
+  const html5QrcodeRunningRef = useRef(false)
   const streamRef = useRef(null)
-  const detectorRef = useRef(null)
-  const animationFrameRef = useRef(0)
-  const lastScanAtRef = useRef(0)
   const closeTimerRef = useRef(0)
   const processingRef = useRef(false)
 
@@ -354,6 +516,10 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
   const [permissionState, setPermissionState] = useState('unknown')
   const [cameraIssue, setCameraIssue] = useState(null)
   const [startAttempt, setStartAttempt] = useState(0)
+  const [manualCode, setManualCode] = useState('')
+  const [manualEntryOpen, setManualEntryOpen] = useState(false)
+  const [scannerDiagnostics, setScannerDiagnostics] = useState(null)
+  const [decoderName, setDecoderName] = useState('native-barcode-detector')
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
@@ -362,31 +528,50 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
     }
   }, [])
 
+  const clearScannerContainer = useCallback(() => {
+    const container = scannerContainerRef.current
+    if (container) container.innerHTML = ''
+  }, [])
+
   const resetCameraState = useCallback(() => {
     setMessage('')
     setOrderLabel('')
     setErrorSource('')
     setPermissionState('unknown')
     setCameraIssue(null)
+    setScannerDiagnostics(null)
+    setDecoderName('native-barcode-detector')
   }, [])
 
-  const stopScanner = useCallback(() => {
-    if (animationFrameRef.current) {
-      window.cancelAnimationFrame(animationFrameRef.current)
-      animationFrameRef.current = 0
-    }
+  const stopScanner = useCallback(async () => {
+    const activeScanner = html5QrcodeRef.current
+    const wasRunning = html5QrcodeRunningRef.current
 
-    const video = videoRef.current
-    if (video) {
-      video.pause?.()
-      video.srcObject = null
-    }
-
+    html5QrcodeRef.current = null
+    html5QrcodeRunningRef.current = false
     stopStream(streamRef.current)
     streamRef.current = null
-    detectorRef.current = null
-    lastScanAtRef.current = 0
-  }, [])
+
+    if (activeScanner) {
+      try {
+        if (wasRunning && typeof activeScanner.stop === 'function') {
+          await activeScanner.stop()
+        }
+      } catch (error) {
+        console.warn('[QR] Failed to stop live scanner:', error)
+      }
+
+      try {
+        if (typeof activeScanner.clear === 'function') {
+          await activeScanner.clear()
+        }
+      } catch (error) {
+        console.warn('[QR] Failed to clear live scanner:', error)
+      }
+    }
+
+    clearScannerContainer()
+  }, [clearScannerContainer])
 
   const scheduleAutoClose = useCallback(() => {
     clearCloseTimer()
@@ -395,29 +580,33 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
     }, AUTO_CLOSE_DELAY_MS)
   }, [clearCloseTimer, onClose])
 
-  const setCameraFailure = useCallback((issue) => {
+  const setCameraFailure = useCallback((issue, { openManual = true } = {}) => {
     setErrorSource('camera')
     setCameraIssue(issue)
     setMessage(issue.message)
     setOrderLabel('')
     setPhase('error')
+    if (openManual) setManualEntryOpen(true)
   }, [])
 
-  const handleRetryCamera = useCallback(() => {
+  const handleRetryCamera = useCallback(async () => {
     clearCloseTimer()
     processingRef.current = false
-    stopScanner()
+    await stopScanner()
     resetCameraState()
+    setManualCode('')
+    setManualEntryOpen(false)
     setPhase('idle')
     setStartAttempt((value) => value + 1)
   }, [clearCloseTimer, resetCameraState, stopScanner])
 
   const handleDetectedCode = useCallback(
     async (code) => {
-      if (!code || processingRef.current) return
+      const submittedCode = typeof code === 'string' ? code.trim() : ''
+      if (!submittedCode || processingRef.current) return
 
       processingRef.current = true
-      stopScanner()
+      await stopScanner()
       setPhase('verifying')
       setMessage('Verifying scanned order...')
       setOrderLabel('')
@@ -425,7 +614,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
       setCameraIssue(null)
 
       try {
-        const result = await onVerify(code)
+        const result = await onVerify(submittedCode)
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate([60, 40, 60])
@@ -455,47 +644,23 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
     [onVerify, scheduleAutoClose, stopScanner]
   )
 
-  const scanFrame = useCallback(async () => {
-    if (!open || processingRef.current || phase !== 'scanning') return
-
-    animationFrameRef.current = window.requestAnimationFrame(() => {
-      void scanFrame()
-    })
-
-    const now = Date.now()
-    if (now - lastScanAtRef.current < SCAN_THROTTLE_MS) return
-    lastScanAtRef.current = now
-
-    const video = videoRef.current
-    const detector = detectorRef.current
-
-    if (
-      !video ||
-      !detector ||
-      video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
-    ) {
-      return
-    }
-
-    try {
-      const barcodes = await detector.detect(video)
-      const code = barcodes.find((item) => item?.rawValue)?.rawValue
-
-      if (code) {
-        void handleDetectedCode(code)
-      }
-    } catch (error) {
-      console.warn('[QR] Scan frame failed:', error)
-    }
-  }, [handleDetectedCode, open, phase])
+  const handleManualSubmit = useCallback(
+    async (event) => {
+      event.preventDefault()
+      await handleDetectedCode(manualCode)
+    },
+    [handleDetectedCode, manualCode]
+  )
 
   useEffect(() => {
     if (!open) {
       clearCloseTimer()
       processingRef.current = false
       setPhase('idle')
+      setManualCode('')
+      setManualEntryOpen(false)
       resetCameraState()
-      stopScanner()
+      void stopScanner()
       return undefined
     }
 
@@ -503,47 +668,62 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
 
     const startScanner = async () => {
       resetCameraState()
+      setManualCode('')
+      setManualEntryOpen(false)
       setPhase('checking-support')
       setMessage('Checking camera support...')
 
-      const support = checkCameraSupport()
+      const diagnostics = await collectScannerDiagnostics()
+      if (cancelled) return
 
-      if (!support.canUseCamera) {
-        if (cancelled) return
+      setScannerDiagnostics(diagnostics)
+      setPermissionState(diagnostics.permissionState)
+      console.info('[QR] Scanner diagnostics', diagnostics)
 
+      if (!diagnostics.hasMediaDevices || !diagnostics.hasGetUserMedia) {
         setCameraFailure(
-          support.isSecureContext
+          diagnostics.isSecureContext
             ? createCameraIssue('unsupported-browser')
             : createCameraIssue('security-blocked')
         )
         return
       }
 
-      const BarcodeDetectorCtor = window.BarcodeDetector
-
-      if (!support.hasBarcodeDetector) {
-        if (cancelled) return
-        setCameraFailure(createCameraIssue('scanner-unsupported'))
+      if (diagnostics.videoInputCount === 0) {
+        setCameraFailure(createCameraIssue('no-camera'))
         return
       }
 
-      const qrFormatSupported = await isQrCodeFormatSupported(BarcodeDetectorCtor)
+      setPhase('loading-decoder')
+      setMessage('Loading live QR scanner...')
+
+      let html5QrcodeApi = null
+      try {
+        html5QrcodeApi = await loadHtml5QrcodeLibrary()
+      } catch (error) {
+        if (cancelled) return
+        setDecoderName('manual-only')
+        setCameraFailure(error?.type ? error : createCameraIssue('decoder-load-failed'))
+        return
+      }
 
       if (cancelled) return
 
-      if (!qrFormatSupported) {
-        setCameraFailure(createCameraIssue('scanner-unsupported'))
-        return
-      }
-
+      setDecoderName('html5-qrcode')
       setPhase('checking-permission')
       setMessage('Checking camera permission...')
 
-      const resolvedPermissionState = await getCameraPermissionState()
+      const resolvedPermissionState =
+        diagnostics.permissionState === 'unknown'
+          ? await getCameraPermissionState()
+          : diagnostics.permissionState
 
       if (cancelled) return
 
       setPermissionState(resolvedPermissionState)
+      setScannerDiagnostics((current) =>
+        current ? { ...current, permissionState: resolvedPermissionState } : current
+      )
 
       if (resolvedPermissionState === 'denied') {
         setCameraFailure(
@@ -562,59 +742,95 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         setMessage('To scan QR codes, please allow camera access.')
       } else {
         setPhase('requesting-camera')
-        setMessage('Starting camera...')
+        setMessage('Requesting camera access...')
       }
 
+      let permissionStream = null
       try {
-        const stream = await requestCameraAccess({
+        permissionStream = await requestCameraAccess({
           permissionState: resolvedPermissionState,
-        })
-
-        if (cancelled) {
-          stopStream(stream)
-          return
-        }
-
-        const video = videoRef.current
-        if (!video) {
-          stopStream(stream)
-          return
-        }
-
-        streamRef.current = stream
-        detectorRef.current = new BarcodeDetectorCtor({ formats: ['qr_code'] })
-        video.srcObject = stream
-
-        if (resolvedPermissionState !== 'granted') {
-          setPermissionState('granted')
-        }
-
-        setPhase('requesting-camera')
-        setMessage('Starting camera...')
-
-        await video.play()
-
-        if (cancelled) {
-          stopStream(stream)
-          return
-        }
-
-        setPhase('scanning')
-        setMessage('Align the QR code inside the frame to verify pickup.')
-        animationFrameRef.current = window.requestAnimationFrame(() => {
-          void scanFrame()
         })
       } catch (error) {
         if (cancelled) return
-
-        const issue =
-          error?.type && error?.message
+        setCameraFailure(
+          error?.type
             ? error
             : classifyCameraError(error, {
                 permissionState: resolvedPermissionState,
               })
+        )
+        return
+      }
 
-        setCameraFailure(issue)
+      if (cancelled) {
+        stopStream(permissionStream)
+        return
+      }
+
+      streamRef.current = permissionStream
+      if (resolvedPermissionState !== 'granted') {
+        setPermissionState('granted')
+      }
+
+      setPhase('starting-live-scan')
+      setMessage('Starting live QR scanner...')
+      stopStream(permissionStream)
+      streamRef.current = null
+      await delay(CAMERA_HANDOFF_DELAY_MS)
+      if (cancelled) return
+
+      const container = scannerContainerRef.current
+      if (!container) {
+        setCameraFailure(createCameraIssue('decoder-init-failed'))
+        return
+      }
+
+      clearScannerContainer()
+
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = html5QrcodeApi
+      const liveScanner = new Html5Qrcode(scannerContainerIdRef.current, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        useBarCodeDetectorIfSupported: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: false,
+        },
+        verbose: false,
+      })
+
+      html5QrcodeRef.current = liveScanner
+
+      try {
+        await liveScanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 240, height: 240 },
+            aspectRatio: 4 / 3,
+            disableFlip: false,
+          },
+          (decodedText) => {
+            void handleDetectedCode(decodedText)
+          },
+          () => {
+            // Ignore frame-level decode misses and keep scanning.
+          }
+        )
+
+        if (cancelled) {
+          await stopScanner()
+          return
+        }
+
+        html5QrcodeRunningRef.current = true
+        setPhase('scanning')
+        setMessage('Align the QR code inside the frame to verify pickup.')
+      } catch (error) {
+        if (cancelled) return
+        setCameraFailure(
+          classifyLiveScannerError(error, {
+            permissionState: resolvedPermissionState,
+          })
+        )
       }
     }
 
@@ -624,16 +840,16 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
       cancelled = true
       clearCloseTimer()
       processingRef.current = false
-      stopScanner()
+      void stopScanner()
     }
   }, [
     clearCloseTimer,
     open,
     resetCameraState,
-    scanFrame,
     setCameraFailure,
     startAttempt,
     stopScanner,
+    handleDetectedCode,
   ])
 
   const isStartingCamera = CAMERA_STARTUP_PHASES.includes(phase)
@@ -644,10 +860,8 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
   const isError = phase === 'error'
   const isVerifyError = isError && errorSource === 'verify'
   const showCameraHelp = isError && errorSource === 'camera' && Boolean(cameraIssue)
-  const canRetryCamera =
-    showCameraHelp &&
-    cameraIssue?.type !== 'unsupported-browser' &&
-    cameraIssue?.type !== 'scanner-unsupported'
+  const showManualEntry = manualEntryOpen || showCameraHelp
+  const canRetryCamera = showCameraHelp && cameraIssue?.type !== 'unsupported-browser'
   const overlayTitle = isSuccess
     ? 'Order Verified'
     : isVerifyError
@@ -656,13 +870,65 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         ? cameraIssue?.title || 'Camera unavailable'
         : phase === 'prompting-permission'
           ? 'Allow camera access'
-          : isPreparingCamera
-            ? 'Starting camera...'
-            : 'Camera ready'
+          : phase === 'loading-decoder'
+            ? 'Loading live scanner...'
+            : phase === 'starting-live-scan'
+              ? 'Starting live scanner...'
+              : isPreparingCamera
+                ? 'Preparing camera...'
+                : 'Camera ready'
   const overlayMessage =
     !isSuccess && !showCameraHelp && isPreparingCamera && !message
       ? 'Preparing camera...'
       : message
+
+  const diagnosticRows = scannerDiagnostics
+    ? [
+        {
+          label: 'Camera API',
+          value:
+            scannerDiagnostics.hasMediaDevices &&
+            scannerDiagnostics.hasGetUserMedia
+              ? 'Available'
+              : 'Unavailable',
+        },
+        {
+          label: 'Video inputs',
+          value:
+            scannerDiagnostics.videoInputCount == null
+              ? 'Unknown'
+              : scannerDiagnostics.videoInputCount,
+        },
+        {
+          label: 'BarcodeDetector',
+          value: scannerDiagnostics.hasBarcodeDetector
+            ? 'Available'
+            : 'Unavailable',
+        },
+        {
+          label: 'Native QR format',
+          value:
+            scannerDiagnostics.nativeQrSupported == null
+              ? scannerDiagnostics.hasBarcodeDetector
+                ? 'Unknown'
+                : 'Unavailable'
+              : scannerDiagnostics.nativeQrSupported
+                ? 'Supported'
+                : 'Not supported',
+        },
+        { label: 'Native formats', value: scannerDiagnostics.nativeBarcodeFormats },
+        { label: 'Permission state', value: formatPermissionState(permissionState) },
+        {
+          label: 'Live decoder',
+          value:
+            decoderName === 'html5-qrcode'
+              ? 'html5-qrcode'
+              : decoderName === 'manual-only'
+                ? 'Manual entry only'
+                : 'Pending',
+        },
+      ]
+    : []
 
   return (
     <Modal
@@ -677,12 +943,10 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
       <div className="space-y-4">
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-inner dark:border-gray-800">
           <div className="relative aspect-[4/3] w-full">
-            <video
-              ref={videoRef}
-              className={`h-full w-full object-cover ${isScanning ? 'opacity-100' : 'opacity-25'}`}
-              autoPlay
-              muted
-              playsInline
+            <div
+              id={scannerContainerIdRef.current}
+              ref={scannerContainerRef}
+              className={`h-full w-full bg-slate-950 ${isScanning ? 'opacity-100' : 'opacity-25'} [&>*]:h-full [&>*]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover`}
             />
 
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -692,15 +956,11 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
             {!isScanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-white">
                 <div className="space-y-3">
-                  {isSuccess ? (
-                    <SuccessStatusIcon />
-                  ) : isError ? (
-                    <ErrorStatusIcon />
-                  ) : isStartingCamera ? (
-                    <SpinnerStatusIcon />
-                  ) : (
-                    <CameraStatusIcon />
-                  )}
+                  <StatusIcon
+                    kind={
+                      isSuccess ? 'success' : isError ? 'error' : isStartingCamera ? 'spinner' : 'camera'
+                    }
+                  />
 
                   {isSuccess ? (
                     <>
@@ -757,12 +1017,12 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         {showCameraHelp && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
             <p className="font-semibold text-slate-900 dark:text-white">
-              Camera help
+              Camera and scanner help
             </p>
             <p className="mt-1">{cameraIssue.message}</p>
 
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-gray-400">
-              Permission status: {formatPermissionState(permissionState)}
+            <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-gray-800 dark:text-gray-300">
+              Native browser QR decoding was limited here, so this modal now tries `html5-qrcode` instead of relying on `BarcodeDetector`.
             </p>
 
             <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-gray-300">
@@ -775,17 +1035,103 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
                 </li>
               ))}
             </ul>
+
+            {diagnosticRows.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-950/60">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-gray-400">
+                  Scanner diagnostics
+                </p>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {diagnosticRows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-gray-800 dark:text-gray-300"
+                    >
+                      <p className="font-semibold text-slate-500 dark:text-gray-400">
+                        {row.label}
+                      </p>
+                      <p className="mt-1 break-words text-slate-800 dark:text-gray-100">
+                        {formatDiagnosticValue(row.value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+        )}
+
+        {showManualEntry ? (
+          <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 dark:border-gray-700 dark:bg-gray-900/60">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  Manual code entry
+                </p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-gray-300">
+                  Paste the full QR value and we will verify it with the backend.
+                </p>
+              </div>
+
+              {!showCameraHelp && (
+                <button
+                  type="button"
+                  onClick={() => setManualEntryOpen(false)}
+                  className="text-xs font-medium text-slate-500 transition hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Hide
+                </button>
+              )}
+            </div>
+
+            <form onSubmit={handleManualSubmit} className="mt-4 space-y-3">
+              <Input
+                name="manualQrCode"
+                label="QR Code"
+                placeholder="Paste the full scanned code here"
+                value={manualCode}
+                onChange={(event) => setManualCode(event.target.value)}
+                disabled={isVerifying}
+                autoComplete="off"
+              />
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  loading={isVerifying}
+                  disabled={!manualCode.trim() || isVerifying}
+                >
+                  Verify Code
+                </Button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          !isSuccess && (
+            <div className="flex justify-start">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setManualEntryOpen(true)}
+                disabled={isVerifying}
+              >
+                Enter Code Manually
+              </Button>
+            </div>
+          )
         )}
 
         <div className="flex justify-end gap-3">
           {canRetryCamera && (
             <Button
               variant="secondary"
-              onClick={handleRetryCamera}
+              onClick={() => {
+                void handleRetryCamera()
+              }}
               disabled={isVerifying}
             >
-              Try Again
+              Try Live Scan Again
             </Button>
           )}
 
