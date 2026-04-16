@@ -1,37 +1,40 @@
 /**
- * ChefOrders.jsx  (MANAGER role)
- * ────────────────────────────────
- * Manager view: Monitor all active orders + mark ready orders as complete.
+ * ChefOrders.jsx (MANAGER role)
+ *
+ * Manager view: monitor active orders, complete ready orders,
+ * and verify pickup via QR scanning.
  */
 
-import { useState, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useNotifications } from '@/context/NotificationContext'
 import { useCanteen } from '@/context/CanteenContext'
+import { ordersService } from '@/services/orders'
 import {
-  ORDER_STATUS,
-  ORDER_STATUS_ICONS,
-  ORDER_STATUS_COLORS,
-  ORDER_STATUS_LABELS,
   MENU_CATEGORY_EMOJIS,
+  ORDER_STATUS,
+  ORDER_STATUS_COLORS,
+  ORDER_STATUS_ICONS,
+  ORDER_STATUS_LABELS,
 } from '@/utils/constants'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import Button from '@/components/ui/Button'
+import QRScannerModal from '@/components/ui/QRScannerModal'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
 const TAB_CONFIG = [
   {
     key: 'monitor',
-    label: '📡 Monitor',
+    label: 'Monitor',
     scope: 'monitor',
     desc: 'All active orders',
   },
   {
     key: 'ready',
-    label: '✅ Ready',
+    label: 'Ready',
     scope: 'ready',
     desc: 'Awaiting pickup',
   },
@@ -53,7 +56,7 @@ function ElapsedBadge({ seconds, timeStatus }) {
           : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
       }`}
     >
-      ⏱ {mins > 0 ? `${mins}m` : `${seconds}s`}
+      T {mins > 0 ? `${mins}m` : `${seconds}s`}
     </span>
   )
 }
@@ -67,7 +70,9 @@ function getEmptyStateText(activeTab, canteen) {
 
   if (activeTab === 'ready') {
     if (canteen.isClosed) return 'Canteen is closed. No pickup queue right now.'
-    if (canteen.isOpening) return 'Opening soon. Pickup queue will appear once orders begin.'
+    if (canteen.isOpening) {
+      return 'Opening soon. Pickup queue will appear once orders begin.'
+    }
     return 'No orders awaiting pickup'
   }
 
@@ -88,12 +93,13 @@ function getEmptyStateText(activeTab, canteen) {
 
 export default function ChefOrders() {
   const [activeTab, setActiveTab] = useState('monitor')
+  const [scannerOpen, setScannerOpen] = useState(false)
   const canteen = useCanteen()
   const operationalActionsBlocked =
     canteen.loading || !canteen.isOperatingAllowed
 
   const currentScope =
-    TAB_CONFIG.find((t) => t.key === activeTab)?.scope ?? 'monitor'
+    TAB_CONFIG.find((tab) => tab.key === activeTab)?.scope ?? 'monitor'
 
   const {
     orders = [],
@@ -107,13 +113,13 @@ export default function ChefOrders() {
   const { addNotification } = useNotifications()
   const [completingId, setCompletingId] = useState(null)
 
-  const visibleOrders = orders.filter((o) =>
+  const visibleOrders = orders.filter((order) =>
     [
       ORDER_STATUS.PAYMENT_PENDING,
       ORDER_STATUS.PENDING,
       ORDER_STATUS.PREPARING,
       ORDER_STATUS.READY,
-    ].includes(o.status)
+    ].includes(order.status)
   )
 
   const { isConnected } = useWebSocket(
@@ -126,14 +132,18 @@ export default function ChefOrders() {
     )
   )
 
+  const handleVerifyQr = useCallback(async (code) => {
+    return await ordersService.verifyOrder(code)
+  }, [])
+
   const handleComplete = async (order) => {
     if (operationalActionsBlocked) {
       toast.error(
         canteen.loading
           ? 'Checking canteen status. Please wait a moment.'
           : canteen.isOpening
-          ? 'Canteen is opening soon. Completion actions stay disabled until service begins.'
-          : 'Canteen is closed. Completion actions are disabled.'
+            ? 'Canteen is opening soon. Completion actions stay disabled until service begins.'
+            : 'Canteen is closed. Completion actions are disabled.'
       )
       return
     }
@@ -142,15 +152,13 @@ export default function ChefOrders() {
 
     try {
       await completeOrder(order.id)
-      toast.success(
-        `${order.orderNumber || order.id} marked as completed.`
-      )
+      toast.success(`${order.orderNumber || order.id} marked as completed.`)
 
       addNotification({
         type: 'complete',
         title: 'Order Completed',
         message: `${order.orderNumber || order.id} marked complete`,
-        icon: '📦',
+        icon: 'Box',
       })
     } catch (err) {
       toast.error(`Failed to complete order: ${err.message}`)
@@ -160,37 +168,37 @@ export default function ChefOrders() {
   }
 
   const pendingCount = visibleOrders.filter(
-    (o) => o.status === ORDER_STATUS.PENDING
+    (order) => order.status === ORDER_STATUS.PENDING
   ).length
   const preparingCount = visibleOrders.filter(
-    (o) => o.status === ORDER_STATUS.PREPARING
+    (order) => order.status === ORDER_STATUS.PREPARING
   ).length
   const readyCount = visibleOrders.filter(
-    (o) => o.status === ORDER_STATUS.READY
+    (order) => order.status === ORDER_STATUS.READY
   ).length
 
   return (
     <div className="animate-fade-in space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="section-title">Manager Dashboard 📊</h2>
+          <h2 className="section-title">Manager Dashboard</h2>
 
           <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
             {pendingCount > 0 && (
               <span className="font-medium text-amber-600 dark:text-amber-400">
-                ⏳ {pendingCount} pending
+                {pendingCount} pending
               </span>
             )}
 
             {preparingCount > 0 && (
               <span className="font-medium text-blue-600 dark:text-blue-400">
-                👨‍🍳 {preparingCount} cooking
+                {preparingCount} cooking
               </span>
             )}
 
             {readyCount > 0 && (
               <span className="font-medium text-green-600 dark:text-green-400">
-                ✅ {readyCount} ready
+                {readyCount} ready
               </span>
             )}
 
@@ -212,58 +220,71 @@ export default function ChefOrders() {
 
           {!canteen.loading &&
             (canteen.isOpening || canteen.isClosing || canteen.isClosed) && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {canteen.isOpening && 'Opening soon — manager can prepare for operations.'}
-              {canteen.isClosing && 'No new orders are expected. Existing orders may still continue.'}
-              {canteen.isClosed && 'Canteen closed — operational actions are limited.'}
-            </p>
-          )}
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {canteen.isOpening &&
+                  'Opening soon - manager can prepare for operations.'}
+                {canteen.isClosing &&
+                  'No new orders are expected. Existing orders may still continue.'}
+                {canteen.isClosed &&
+                  'Canteen closed - operational actions are limited.'}
+              </p>
+            )}
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={refetch}
-          icon="🔄"
-          disabled={loading}
-        >
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setScannerOpen(true)}
+            icon="Scan"
+          >
+            Scan QR
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refetch}
+            icon="Refresh"
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="w-fit rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
-        {TAB_CONFIG.map((t) => (
+        {TAB_CONFIG.map((tab) => (
           <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              activeTab === t.key
+              activeTab === tab.key
                 ? 'bg-white text-gray-900 shadow dark:bg-gray-900 dark:text-white'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
       {error && (
         <div className="glass-card border border-red-200 p-4 text-sm text-red-500 dark:border-red-900">
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
       {loading ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} lines={4} />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <SkeletonCard key={index} lines={4} />
           ))}
         </div>
       ) : visibleOrders.length === 0 ? (
         <div className="py-20 text-center">
-          <div className="mb-3 text-5xl">
-            {activeTab === 'ready' ? '✅' : '📡'}
-          </div>
+          <div className="mb-3 text-5xl">{activeTab === 'ready' ? 'Ready' : 'Monitor'}</div>
           <p className="font-medium text-gray-500 dark:text-gray-400">
             {getEmptyStateText(activeTab, canteen)}
           </p>
@@ -312,13 +333,13 @@ export default function ChefOrders() {
 
                 <div className="mb-3 space-y-1 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
                   {Array.isArray(order.items) &&
-                    order.items.map((item, i) => (
+                    order.items.map((item, index) => (
                       <div
-                        key={i}
+                        key={index}
                         className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
                       >
                         <span className="flex items-center gap-1.5">
-                          <span>{MENU_CATEGORY_EMOJIS[item.category] || '🍴'}</span>
+                          <span>{MENU_CATEGORY_EMOJIS[item.category] || 'Item'}</span>
                           <span>{item.name}</span>
                         </span>
 
@@ -346,17 +367,17 @@ export default function ChefOrders() {
                     onClick={() => handleComplete(order)}
                     loading={completingId === order.id}
                     disabled={operationalActionsBlocked}
-                    icon="📦"
+                    icon="Complete"
                   >
                     {canteen.loading
                       ? 'Checking Status...'
                       : completingId === order.id
-                      ? 'Completing Order...'
-                      : canteen.isOpening
-                      ? 'Unavailable Until Open'
-                      : canteen.isClosed
-                        ? 'Unavailable While Closed'
-                        : 'Complete Order'}
+                        ? 'Completing Order...'
+                        : canteen.isOpening
+                          ? 'Unavailable Until Open'
+                          : canteen.isClosed
+                            ? 'Unavailable While Closed'
+                            : 'Complete Order'}
                   </Button>
                 )}
               </motion.div>
@@ -364,6 +385,12 @@ export default function ChefOrders() {
           </AnimatePresence>
         </div>
       )}
+
+      <QRScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onVerify={handleVerifyQr}
+      />
     </div>
   )
-} 
+}

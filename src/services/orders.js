@@ -111,6 +111,12 @@ export const ordersService = {
     return api.post(ENDPOINTS.REORDER(orderId))
   },
 
+  async verifyOrder(code) {
+    return api.post(ENDPOINTS.ORDER_VERIFY, null, {
+      params: { code },
+    })
+  },
+
   async fetchInvoiceAsset(orderId) {
     const response = await apiClient.get(ENDPOINTS.INVOICE(orderId), {
       responseType: 'blob',
