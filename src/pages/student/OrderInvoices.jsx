@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useOrders } from '@/hooks/useOrders'
-import { ordersService } from '@/services/orders'
+import { ordersService, canAccessInvoice } from '@/services/orders'
 import { formatCurrency } from '@/utils/helpers'
 import Button from '@/components/ui/Button'
 import { SkeletonCard } from '@/components/ui/Skeleton'
@@ -31,7 +31,7 @@ export default function OrderInvoices() {
 
   const invoiceOrders = useMemo(() => {
     return [...orders]
-      .filter((order) => order?.canDownloadInvoice !== false)
+      .filter((order) => canAccessInvoice(order))
       .sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0))
   }, [orders])
 
@@ -54,7 +54,7 @@ export default function OrderInvoices() {
         <div>
           <h2 className="section-title">Order Invoice 📄</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Download invoices for your previous orders.
+            Download invoices for any order you have placed.
           </p>
         </div>
 
@@ -76,7 +76,7 @@ export default function OrderInvoices() {
             No invoices available yet
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Place an order first, then you can download its invoice from here.
+            Place an order first, then its invoice will appear here.
           </p>
           <div className="mt-6">
             <Button onClick={() => navigate('/student/menu')}>Browse Menu</Button>

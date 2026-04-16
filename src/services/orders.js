@@ -1,6 +1,12 @@
 import api, { apiClient } from './api'
 import { ENDPOINTS } from '@/utils/constants'
 
+export function canAccessInvoice(order) {
+  if (!order) return false
+
+  return Boolean(order.id || order.orderNumber)
+}
+
 function normaliseOrderItem(item) {
   const food = item?.foodItem ?? item?.menuItem ?? item
   const parsedQuantity = Number(item?.quantity ?? item?.qty)
@@ -53,7 +59,7 @@ export function normaliseOrder(raw) {
       items.reduce((sum, item) => sum + (item.quantity || 0), 0),
     shortDescription: raw.shortDescription ?? '',
     canReorder: raw.canReorder ?? true,
-    canDownloadInvoice: raw.canDownloadInvoice ?? true,
+    canDownloadInvoice: canAccessInvoice(raw),
     elapsedSeconds: raw.elapsedSeconds ?? 0,
     timeStatus: raw.timeStatus ?? '',
   }

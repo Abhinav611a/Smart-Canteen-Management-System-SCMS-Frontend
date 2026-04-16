@@ -12,7 +12,7 @@ import { RefreshCw, ChevronDown, ChevronUp, Clock3 } from 'lucide-react'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useCanteen } from '@/context/CanteenContext'
-import { ordersService } from '@/services/orders'
+import { ordersService, canAccessInvoice } from '@/services/orders'
 import { ratingService } from '@/services/ratingService'
 import RatingModal from '@/components/ui/RatingModal'
 import InvoicePreviewModal from '@/components/ui/InvoicePreviewModal'
@@ -414,6 +414,7 @@ export default function StudentOrders() {
       <div className="space-y-3">
         {orders.map((order) => {
           const isExpanded = expandedId === order.id
+          const showInvoiceAction = canAccessInvoice(order)
           const isActive = [
             ORDER_STATUS.PENDING,
             ORDER_STATUS.PREPARING,
@@ -558,7 +559,7 @@ export default function StudentOrders() {
                       </button>
                     )}
 
-                    {order.canDownloadInvoice && (
+                    {showInvoiceAction && (
                       <button
                         type="button"
                         disabled={invoicePreview.loading}

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { useOrders } from '@/hooks/useOrders'
-import { ordersService } from '@/services/orders'
+import { ordersService, canAccessInvoice } from '@/services/orders'
 import { getInitials, formatCurrency } from '@/utils/helpers'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
@@ -202,7 +202,7 @@ export default function StudentProfile() {
                     onClick={() => handleDownloadInvoice(o.id)}
                     disabled={
                       downloadingInvoiceId === o.id ||
-                      o.canDownloadInvoice === false
+                      !canAccessInvoice(o)
                     }
                     className="rounded-lg border border-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
