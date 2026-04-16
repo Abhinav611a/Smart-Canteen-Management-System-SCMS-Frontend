@@ -47,7 +47,7 @@ export const authService = {
     return {
       ...data,
       email,
-      user: data?.user ? normaliseUser(data.user) : null,
+      user: data ? normaliseUser(data) : null,
     }
   },
 

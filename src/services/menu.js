@@ -30,8 +30,13 @@ export const menuService = {
   },
 
   async getById(id) {
-    const data = await api.get(ENDPOINTS.MENU_ITEM(id))
-    return data ? normaliseItem(data) : null
+    const data = await api.get(ENDPOINTS.MENU, {
+      params: {
+        size: 1000,
+      },
+    })
+    const items = normalisePage(data)
+    return items.find((item) => Number(item.id) === Number(id)) ?? null
   },
 
   async create(data) {

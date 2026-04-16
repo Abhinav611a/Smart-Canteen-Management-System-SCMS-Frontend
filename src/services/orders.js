@@ -3,11 +3,14 @@ import { ENDPOINTS } from '@/utils/constants'
 
 function normaliseOrderItem(item) {
   const food = item?.foodItem ?? item?.menuItem ?? item
+  const parsedQuantity = Number(item?.quantity ?? item?.qty)
+  const quantity =
+    Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1
 
   return {
-    id: item?.id ?? food?.id,
-    foodItemId: item?.foodItemId ?? food?.id,
-    cartItemId: item?.cartItemId ?? item?.id,
+    id: item?.foodItemId ?? food?.id ?? item?.id,
+    foodItemId: item?.foodItemId ?? food?.id ?? item?.id,
+    cartItemId: item?.cartItemId ?? null,
     name: item?.name ?? food?.name ?? 'Item',
     category:
       item?.foodCategory ??
@@ -16,8 +19,8 @@ function normaliseOrderItem(item) {
       food?.category ??
       'MAIN',
     price: Number(item?.price ?? food?.price ?? 0),
-    quantity: Number(item?.quantity ?? item?.qty ?? 1),
-    qty: Number(item?.quantity ?? item?.qty ?? 1),
+    quantity,
+    qty: quantity,
     available: item?.available ?? food?.available ?? true,
   }
 }
@@ -25,7 +28,10 @@ function normaliseOrderItem(item) {
 export function normaliseOrder(raw) {
   if (!raw) return null
 
-  const items = (raw.orderItems ?? raw.items ?? []).map(normaliseOrderItem)
+  const sourceItems = Array.isArray(raw.items)
+    ? raw.items
+    : (raw.orderItems ?? [])
+  const items = sourceItems.map(normaliseOrderItem)
   const user = raw.user ?? raw.student ?? null
 
   return {
@@ -112,7 +118,7 @@ export const ordersService = {
   },
 
   async verifyOrder(code) {
-    return api.post(ENDPOINTS.ORDER_VERIFY, null, {
+    return api.get(ENDPOINTS.ORDER_VERIFY, {
       params: { code },
     })
   },
@@ -162,7 +168,11 @@ export const ordersService = {
     return this.downloadInvoice(orderId)
   },
 
+  async cancel(id) {
+    return api.patch(ENDPOINTS.ORDER_CANCEL(id))
+  },
+
   async delete(id) {
-    return api.delete(ENDPOINTS.ORDER(id))
+    return api.patch(ENDPOINTS.ORDER_CANCEL(id))
   },
 }

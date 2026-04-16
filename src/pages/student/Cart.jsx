@@ -145,12 +145,13 @@ export default function StudentCart() {
       replaceCartFromServer(backendCart)
 
       const order = await cartService.checkout({ paymentMethod })
+      const placedPaymentMethod = order?.paymentMethod ?? paymentMethod
 
       await refreshCart({ silent: true })
 
       setPlaced({
         ...order,
-        paymentMethod,
+        paymentMethod: placedPaymentMethod,
       })
 
       addNotification({
@@ -162,9 +163,23 @@ export default function StudentCart() {
         icon: '🍽',
       })
 
-      toast.success(`Order placed with ${paymentMethod}`)
+      toast.success(`Order placed with ${placedPaymentMethod}`)
     } catch (error) {
       console.error('Checkout failed:', error)
+      if (error?.checkoutDebug) {
+        console.error('Checkout debug payload:', error.checkoutDebug)
+      }
+      console.error('Checkout error status:', error?.response?.status)
+      console.error('Checkout error data:', error?.response?.data)
+      console.error(
+        'Checkout error data JSON:',
+        JSON.stringify(error?.response?.data ?? null, null, 2),
+      )
+      console.error('Checkout error headers:', error?.response?.headers)
+      console.error(
+        'Checkout error headers JSON:',
+        JSON.stringify(error?.response?.headers ?? null, null, 2),
+      )
 
       const status = error?.response?.status
       const backendMessage =
@@ -175,13 +190,17 @@ export default function StudentCart() {
       const message = String(backendMessage || '').toLowerCase()
 
       if (
+        error?.code === 'INVALID_CART_ITEMS' ||
         isCartMismatchError(error) ||
         error?.code === 'CART_EMPTY' ||
         message.includes('cart not found') ||
         message.includes('cart is empty') ||
         message.includes('empty cart')
       ) {
-        await syncUiToServerCart()
+        await syncUiToServerCart({
+          latestCart: error?.latestCart,
+          message: error?.message || SERVER_SYNC_MESSAGE,
+        })
       } else if (status === 400) {
         toast.error(backendMessage || 'Checkout request is invalid.')
       } else {

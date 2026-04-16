@@ -12,6 +12,11 @@ import { LS_KEYS } from '@/utils/constants'
 import { useAuth } from '@/context/AuthContext'
 import { useCanteen } from '@/context/CanteenContext'
 import { cartService } from '@/services/cartService'
+import {
+  getCartItemIdentity,
+  normaliseCartItem,
+  normaliseCartItems,
+} from '@/utils/cart'
 
 const CartContext = createContext(null)
 
@@ -33,15 +38,23 @@ function cartReducer(state, action) {
       return { ...state, items: action.items ?? [] }
 
     case 'ADD_LOCAL': {
-      const exists = state.items.find((item) => item.id === action.item.id)
+      const nextItem = normaliseCartItem({
+        ...action.item,
+        quantity: 1,
+        qty: 1,
+      })
+      const nextItemId = getCartItemIdentity(nextItem)
+      const exists = state.items.find(
+        (item) => getCartItemIdentity(item) === nextItemId,
+      )
 
       if (exists) {
         const nextQty = (exists.qty || exists.quantity || 0) + 1
         return {
           ...state,
           items: state.items.map((item) =>
-            item.id === action.item.id
-              ? { ...item, qty: nextQty, quantity: nextQty }
+            getCartItemIdentity(item) === nextItemId
+              ? { ...item, ...nextItem, qty: nextQty, quantity: nextQty }
               : item,
           ),
         }
@@ -49,7 +62,7 @@ function cartReducer(state, action) {
 
       return {
         ...state,
-        items: [...state.items, { ...action.item, qty: 1, quantity: 1 }],
+        items: [...state.items, nextItem],
       }
     }
 
@@ -58,9 +71,11 @@ function cartReducer(state, action) {
         ...state,
         items:
           action.qty <= 0
-            ? state.items.filter((item) => item.id !== action.id)
+            ? state.items.filter(
+                (item) => getCartItemIdentity(item) !== String(action.id),
+              )
             : state.items.map((item) =>
-                item.id === action.id
+                getCartItemIdentity(item) === String(action.id)
                   ? { ...item, qty: action.qty, quantity: action.qty }
                   : item,
               ),
@@ -75,7 +90,7 @@ function cartReducer(state, action) {
 }
 
 function buildCartSummary(items = []) {
-  const safeItems = Array.isArray(items) ? items : []
+  const safeItems = normaliseCartItems(items)
 
   return {
     id: null,
@@ -154,7 +169,9 @@ export function CartProvider({ children }) {
 
   const applyCart = useCallback(
     (cart, { outOfSync = false } = {}) => {
-      const nextItems = cart?.items ?? []
+      const nextItems = normaliseCartItems(cart?.items ?? [], {
+        previousItems: itemsRef.current,
+      })
       dispatch({ type: 'SET_CART', items: nextItems })
       dispatch({
         type: 'SET_STATUS',
@@ -227,7 +244,10 @@ export function CartProvider({ children }) {
     try {
       const saved = localStorage.getItem(LS_KEYS.CART)
       if (saved) {
-        dispatch({ type: 'HYDRATE', items: JSON.parse(saved) })
+        dispatch({
+          type: 'HYDRATE',
+          items: normaliseCartItems(JSON.parse(saved)),
+        })
       }
     } catch {
       clearPersistedLocalCart()
@@ -328,7 +348,9 @@ export function CartProvider({ children }) {
 
   const removeItem = useCallback(
     async (id) => {
-      const current = itemsRef.current.find((item) => item.id === id)
+      const current = itemsRef.current.find(
+        (item) => getCartItemIdentity(item) === String(id),
+      )
       const currentQty = current?.qty || current?.quantity || 0
 
       if (currentQty <= 0) return
@@ -349,7 +371,9 @@ export function CartProvider({ children }) {
 
   const updateQty = useCallback(
     async (id, qty) => {
-      const current = itemsRef.current.find((item) => item.id === id)
+      const current = itemsRef.current.find(
+        (item) => getCartItemIdentity(item) === String(id),
+      )
       if (!current) return
 
       const currentQty = current?.qty || current?.quantity || 0

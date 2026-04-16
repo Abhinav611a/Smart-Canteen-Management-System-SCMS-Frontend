@@ -37,6 +37,7 @@ export const ENDPOINTS = {
 
   ORDERS: '/orders',
   ORDER: (id) => `/orders/${id}`,
+  ORDER_CANCEL: (id) => `/orders/${id}/cancel`,
   ORDER_VERIFY: '/orders/verify',
   MY_ORDERS: '/orders/my-orders',
   REORDER: (id) => `/orders/${id}/reorder`,

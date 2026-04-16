@@ -21,6 +21,22 @@ function getRequestLogContext(config = {}) {
   }
 }
 
+function stringifyApiLogValue(value) {
+  if (typeof value === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2)
+    } catch {
+      return value
+    }
+  }
+
+  try {
+    return JSON.stringify(value ?? null, null, 2)
+  } catch (error) {
+    return `[unserializable api log value: ${error.message}]`
+  }
+}
+
 function decodeJwtPayload(token) {
   try {
     const base64 = token.split('.')[1]
@@ -128,9 +144,7 @@ apiClient.interceptors.request.use(
     config.headers = config.headers || {}
 
     const explicitAuthHeader =
-      config.headers.Authorization ||
-      config.headers.authorization ||
-      apiClient.defaults.headers.common.Authorization
+      config.headers.Authorization || config.headers.authorization
 
     if (explicitAuthHeader) {
       config.headers.Authorization = explicitAuthHeader
@@ -286,6 +300,15 @@ apiClient.interceptors.response.use(
         break
 
       case typeof status === 'number' && status >= 500:
+        console.error('[API] 5xx response request context', requestContext)
+        console.error('[API] 5xx request payload\n' + stringifyApiLogValue(originalRequest.data))
+        console.error('[API] 5xx response status', status)
+        console.error('[API] 5xx response body', body)
+        console.error('[API] 5xx response body JSON\n' + stringifyApiLogValue(body))
+        console.error(
+          '[API] 5xx response headers JSON\n' +
+            stringifyApiLogValue(error.response?.headers),
+        )
         toast.error('Server error. Please try again later.')
         break
 
