@@ -46,21 +46,25 @@ function ClosingSoonBanner({ countdown, remainingMs }) {
           </div>
 
           <h3 className="mt-3 text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-xl">
-            Hurry up — the canteen is closing soon
+            Hurry up! Canteen is closing in {countdown}
           </h3>
 
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Place your order before the timer runs out.
-          </p>
-
-          <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
-            Closing in {countdown}
+            Place your order before the timer ends.
           </p>
         </div>
 
         <div className="flex items-center gap-3 self-start lg:self-center">
-          <TimeBox value={String(minutes).padStart(2, '0')} label="Min" urgent={urgent} />
-          <TimeBox value={String(seconds).padStart(2, '0')} label="Sec" urgent={urgent} />
+          <TimeBox
+            value={String(minutes).padStart(2, '0')}
+            label="Min"
+            urgent={urgent}
+          />
+          <TimeBox
+            value={String(seconds).padStart(2, '0')}
+            label="Sec"
+            urgent={urgent}
+          />
         </div>
       </div>
     </div>
@@ -84,11 +88,12 @@ function OpeningBanner() {
           </div>
 
           <h3 className="mt-3 text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-xl">
-            We’re getting things ready for you
+            We are getting things ready for you
           </h3>
 
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            The canteen is opening shortly. You can browse the menu while the team prepares service.
+            The canteen is opening shortly. You can browse the menu while the
+            team prepares service.
           </p>
         </div>
       </div>
@@ -152,19 +157,24 @@ function ClosedBanner() {
 
 export default function CanteenBanner() {
   const {
+    loading,
     isOpen,
     isOpening,
     isClosing,
     isClosed,
-    hasClosingWarning,
+    closingSoonUntilMs,
     countdown,
     remainingMs,
   } = useCanteen()
   const { user } = useAuth()
   const userRole = String(user?.role || '').toUpperCase()
   const isStudent = userRole === 'USER'
+  const showStudentClosingSoonCountdown =
+    isStudent && isOpen && closingSoonUntilMs != null && remainingMs > 0
 
-  if (isOpen && hasClosingWarning && isStudent) {
+  if (loading) return null
+
+  if (showStudentClosingSoonCountdown) {
     return <ClosingSoonBanner countdown={countdown} remainingMs={remainingMs} />
   }
 

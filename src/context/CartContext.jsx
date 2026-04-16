@@ -83,7 +83,11 @@ function cartReducer(state, action) {
 
 export function CartProvider({ children }) {
   const { isAuthenticated, user } = useAuth()
-  const { isOrderingAllowed, orderBlockedMessage } = useCanteen()
+  const {
+    loading: canteenLoading,
+    isOrderingAllowed,
+    orderBlockedMessage,
+  } = useCanteen()
   const [state, dispatch] = useReducer(cartReducer, initialState)
 
   const role = String(user?.role || '').trim().toUpperCase()
@@ -169,6 +173,11 @@ export function CartProvider({ children }) {
 
   const addItem = useCallback(
     async (item) => {
+      if (canteenLoading) {
+        toast.error('Checking canteen status. Please wait a moment.')
+        return
+      }
+
       if (!isOrderingAllowed) {
         toast.error(orderBlockedMessage || 'Canteen is not accepting new orders right now.')
         return
@@ -194,7 +203,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole, isOrderingAllowed, orderBlockedMessage]
+    [canteenLoading, isCartRole, isOrderingAllowed, orderBlockedMessage]
   )
 
   const removeItem = useCallback(
@@ -247,6 +256,11 @@ export function CartProvider({ children }) {
       const currentQty = current?.qty || current?.quantity || 0
       const isIncrease = qty > currentQty
 
+      if (isIncrease && canteenLoading) {
+        toast.error('Checking canteen status. Please wait a moment.')
+        return
+      }
+
       if (isIncrease && !isOrderingAllowed) {
         toast.error(orderBlockedMessage || 'Canteen is not accepting new orders right now.')
         return
@@ -281,7 +295,7 @@ export function CartProvider({ children }) {
         dispatch({ type: 'SET_SYNCING', value: false })
       }
     },
-    [isCartRole, isOrderingAllowed, orderBlockedMessage]
+    [canteenLoading, isCartRole, isOrderingAllowed, orderBlockedMessage]
   )
 
   const clearCart = useCallback(async () => {

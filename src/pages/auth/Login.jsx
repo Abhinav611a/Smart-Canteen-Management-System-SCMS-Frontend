@@ -20,7 +20,7 @@ const GoogleIcon = () => (
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, error: authError, clearError } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
@@ -48,7 +48,13 @@ export default function Login() {
       const user = await login(form)
       navigate(getRoleHome(user.role), { replace: true })
     } catch (error) {
-      toast.error(error.message || 'Login failed. Check your credentials.')
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to sign in. Please check your credentials and try again.'
+
+      toast.error(message, { id: 'login-error' })
     } finally {
       setLoading(false)
     }
@@ -87,6 +93,12 @@ export default function Login() {
             Sign In
           </h2>
 
+          {authError && (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+              {authError}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               id="email"
@@ -95,9 +107,11 @@ export default function Login() {
               type="email"
               placeholder="you@example.com"
               value={form.email}
-              onChange={(event) =>
+              onChange={(event) => {
+                if (authError) clearError()
+                setErrors((prev) => ({ ...prev, email: undefined }))
                 setForm((prev) => ({ ...prev, email: event.target.value }))
-              }
+              }}
               error={errors.email}
               icon="✉️"
               autoComplete="email"
@@ -110,9 +124,11 @@ export default function Login() {
               type="password"
               placeholder="••••••••"
               value={form.password}
-              onChange={(event) =>
+              onChange={(event) => {
+                if (authError) clearError()
+                setErrors((prev) => ({ ...prev, password: undefined }))
                 setForm((prev) => ({ ...prev, password: event.target.value }))
-              }
+              }}
               error={errors.password}
               icon="🔒"
               autoComplete="current-password"

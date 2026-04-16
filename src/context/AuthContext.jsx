@@ -19,6 +19,7 @@ import {
 } from '@/services/api'
 import { websocketService } from '@/services/websocketService'
 import { LS_KEYS } from '@/utils/constants'
+import { canteenService, CANTEEN_STATUS } from '@/services/canteenService'
 
 const AuthContext = createContext(null)
 
@@ -82,6 +83,24 @@ function normalizeUser(user = {}) {
     ...user,
     role: sanitizeRole(user.role),
   }
+}
+
+function isStaffRole(role) {
+  const normalizedRole = sanitizeRole(role)
+  return normalizedRole === 'KITCHEN' || normalizedRole === 'MANAGER'
+}
+
+function extractAuthErrorMessage(
+  error,
+  fallback = 'Unable to sign in right now. Please try again.'
+) {
+  const message =
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback
+
+  return String(message).trim() || fallback
 }
 
 function decodeJwtPayload(token) {
@@ -156,61 +175,120 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
+  const clearError = useCallback(() => {
+    dispatch({ type: 'CLEAR_ERROR' })
+  }, [])
+
+  const getStoredSessionBlockMessage = useCallback(async (token, user) => {
+    if (!token || !isStaffRole(user?.role)) return ''
+
+    try {
+      const canteenState = await canteenService.getState({
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      return canteenState?.status === CANTEEN_STATUS.CLOSED
+        ? 'Canteen is closed. Login not allowed.'
+        : ''
+    } catch (error) {
+      const message = extractAuthErrorMessage(error, '')
+      const normalizedMessage = message.toLowerCase()
+
+      if (
+        normalizedMessage.includes('canteen is closed') ||
+        normalizedMessage.includes('contact your admin')
+      ) {
+        return message
+      }
+
+      console.warn('[AUTH] Unable to verify staff canteen access:', error)
+      return ''
+    }
+  }, [])
+
   useEffect(() => {
-    console.log('[AUTH] INIT START')
+    let active = true
 
-    const storage = getAuthStorage()
-    const token = storage.getItem(LS_KEYS.JWT)
-    const userRaw = storage.getItem(LS_KEYS.USER)
+    const initialiseAuth = async () => {
+      console.log('[AUTH] INIT START')
 
-    console.log('[AUTH] INIT STORAGE', {
-      hasToken: !!token,
-      hasUser: !!userRaw,
-    })
+      const storage = getAuthStorage()
+      const token = storage.getItem(LS_KEYS.JWT)
+      const userRaw = storage.getItem(LS_KEYS.USER)
 
-    if (token && userRaw) {
-      try {
-        const user = normalizeUser(JSON.parse(userRaw))
+      console.log('[AUTH] INIT STORAGE', {
+        hasToken: !!token,
+        hasUser: !!userRaw,
+      })
 
-        apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
+      if (token && userRaw) {
+        try {
+          const user = normalizeUser(JSON.parse(userRaw))
+          const blockedMessage = await getStoredSessionBlockMessage(token, user)
 
-        dispatch({
-          type: 'INIT',
-          user,
-          token,
-        })
+          if (!active) return
 
-        console.log('[AUTH] INIT SUCCESS', { user })
-        connectWebSocket(token, user)
-        startSilentRefresh()
-      } catch (error) {
-        console.error('[AUTH] INIT PARSE FAILED', error)
-        clearStoredAuth()
+          if (blockedMessage) {
+            clearStoredAuth()
+            dispatch({
+              type: 'SET_ERROR',
+              error: blockedMessage,
+            })
 
+            if (window.location.pathname !== '/login') {
+              navigate('/login', { replace: true })
+            }
+            return
+          }
+
+          apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
+
+          dispatch({
+            type: 'INIT',
+            user,
+            token,
+          })
+
+          console.log('[AUTH] INIT SUCCESS', { user })
+          connectWebSocket(token, user)
+          startSilentRefresh()
+        } catch (error) {
+          console.error('[AUTH] INIT PARSE FAILED', error)
+          clearStoredAuth()
+
+          if (!active) return
+
+          dispatch({
+            type: 'INIT',
+            user: null,
+            token: null,
+          })
+        }
+      } else {
         dispatch({
           type: 'INIT',
           user: null,
           token: null,
         })
+        console.log('[AUTH] INIT EMPTY')
       }
-    } else {
-      dispatch({
-        type: 'INIT',
-        user: null,
-        token: null,
-      })
-      console.log('[AUTH] INIT EMPTY')
     }
 
+    initialiseAuth()
+
     return () => {
+      active = false
       websocketService.disconnect()
       wsTriedRef.current = false
       stopSilentRefresh()
     }
-  }, [connectWebSocket, startSilentRefresh])
+  }, [connectWebSocket, getStoredSessionBlockMessage, navigate, startSilentRefresh])
 
   const login = useCallback(
     async (credentials) => {
+      dispatch({ type: 'CLEAR_ERROR' })
       dispatch({ type: 'SET_LOADING', value: true })
 
       try {
@@ -227,7 +305,7 @@ export function AuthProvider({ children }) {
         const user = normalizeUser(rawUser)
 
         if (!token) {
-          throw new Error('Login response missing token')
+          throw new Error('Unable to sign in right now. Please try again.')
         }
 
         const persistedUser = persistAuth(token, user, refreshToken)
@@ -251,12 +329,17 @@ export function AuthProvider({ children }) {
         websocketService.disconnect()
         wsTriedRef.current = false
         stopSilentRefresh()
+        const message = extractAuthErrorMessage(
+          error,
+          'Unable to sign in. Please check your credentials and try again.'
+        )
 
         dispatch({
           type: 'SET_ERROR',
-          error: error?.message || 'Login failed',
+          error: message,
         })
 
+        error.message = message
         throw error
       }
     },
@@ -342,29 +425,58 @@ export function AuthProvider({ children }) {
   const completeOAuthLogin = useCallback(
     async (token, user, refreshToken = null) => {
       if (!token || !user) {
-        throw new Error('OAuth login requires token and user')
+        const error = new Error(
+          'Google sign-in could not be completed. Please try again.'
+        )
+        dispatch({
+          type: 'SET_ERROR',
+          error: error.message,
+        })
+        throw error
       }
 
+      dispatch({ type: 'CLEAR_ERROR' })
       websocketService.disconnect()
       wsTriedRef.current = false
       stopSilentRefresh()
       clearStoredAuth()
 
-      const normalizedUser = persistAuth(token, user, refreshToken)
+      try {
+        const normalizedUser = persistAuth(token, user, refreshToken)
 
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        user: normalizedUser,
-        token,
-      })
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          user: normalizedUser,
+          token,
+        })
 
-      await connectWebSocket(token, normalizedUser)
-      startSilentRefresh()
+        await connectWebSocket(token, normalizedUser)
+        startSilentRefresh()
 
-      const displayName = normalizedUser?.name || normalizedUser?.email || 'User'
+        const displayName =
+          normalizedUser?.name || normalizedUser?.email || 'User'
 
-      toast.success(`Welcome back, ${displayName}!`)
-      return normalizedUser
+        toast.success(`Welcome back, ${displayName}!`)
+        return normalizedUser
+      } catch (error) {
+        clearStoredAuth()
+        websocketService.disconnect()
+        wsTriedRef.current = false
+        stopSilentRefresh()
+
+        const message = extractAuthErrorMessage(
+          error,
+          'Google sign-in failed. Please try again.'
+        )
+
+        dispatch({
+          type: 'SET_ERROR',
+          error: message,
+        })
+
+        error.message = message
+        throw error
+      }
     },
     [connectWebSocket, startSilentRefresh]
   )
@@ -392,6 +504,7 @@ export function AuthProvider({ children }) {
         resendOtp,
         logout,
         completeOAuthLogin,
+        clearError,
       }}
     >
       {children}

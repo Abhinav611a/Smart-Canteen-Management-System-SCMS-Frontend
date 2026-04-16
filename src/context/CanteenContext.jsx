@@ -16,6 +16,7 @@ import {
   CANTEEN_STATUS,
   getCanteenView,
   normaliseCanteenState,
+  parseCanteenTimestamp,
 } from '@/services/canteenService'
 
 const CanteenContext = createContext(null)
@@ -23,27 +24,25 @@ const CanteenContext = createContext(null)
 const DEFAULT_RAW_STATE = {
   status: CANTEEN_STATUS.CLOSED,
   closingSoonUntil: null,
+  closingSoonUntilMs: null,
   kitchenReady: false,
   managerReady: false,
 }
 
-function getRemainingMs(closingSoonUntil) {
-  if (!closingSoonUntil) return 0
+function getRemainingMsForStatus(status, closingSoonUntilMs) {
+  if (status !== CANTEEN_STATUS.OPEN || closingSoonUntilMs == null) return 0
 
-  const ts = new Date(closingSoonUntil).getTime()
-  if (Number.isNaN(ts)) return 0
-
-  return Math.max(0, ts - Date.now())
+  return Math.max(0, closingSoonUntilMs - Date.now())
 }
 
 function formatCountdown(ms) {
-  if (!ms || ms <= 0) return '0:00'
+  if (!ms || ms <= 0) return '00:00'
 
   const totalSeconds = Math.ceil(ms / 1000)
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
 
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 export function CanteenProvider({ children }) {
@@ -56,14 +55,13 @@ export function CanteenProvider({ children }) {
   const previousStatusRef = useRef(DEFAULT_RAW_STATE.status)
   const hasWebSocketDataRef = useRef(false)
   const isConnectedRef = useRef(false)
+  const hasResolvedStateRef = useRef(false)
 
-  const { isConnected } = useWebSocket(
-    'canteen:status',
-    (payload) => {
-      const nextState = normaliseCanteenState(payload)
+  const applyStateUpdate = useCallback(
+    (incomingState, { source = 'unknown', markWebSocket = false } = {}) => {
+      const nextState = normaliseCanteenState(incomingState)
       const previousStatus = previousStatusRef.current
 
-      // Show auto-close toast to all authenticated users (global state change)
       if (
         user &&
         previousStatus === CANTEEN_STATUS.CLOSING &&
@@ -77,13 +75,30 @@ export function CanteenProvider({ children }) {
 
       setRawState(nextState)
       previousStatusRef.current = nextState.status
+      hasResolvedStateRef.current = true
       setLoading(false)
       setError('')
       setNow(Date.now())
-      hasWebSocketDataRef.current = true
+
+      if (markWebSocket) {
+        hasWebSocketDataRef.current = true
+      }
+
       setLastUpdate({
         at: Date.now(),
         payload: nextState,
+        source,
+      })
+    },
+    [user]
+  )
+
+  const { isConnected } = useWebSocket(
+    'canteen:status',
+    (payload) => {
+      applyStateUpdate(payload, {
+        source: 'websocket',
+        markWebSocket: true,
       })
     },
     true
@@ -98,27 +113,28 @@ export function CanteenProvider({ children }) {
     }
 
     try {
-      setLoading(true)
+      if (!hasResolvedStateRef.current) {
+        setLoading(true)
+      }
       setError('')
 
       const state = await canteenService.getState()
-      const nextState = normaliseCanteenState(state)
 
       // Ignore stale REST data if websocket became authoritative while fetching.
       if (isConnectedRef.current && hasWebSocketDataRef.current) {
         return
       }
 
-      setRawState(nextState)
-      previousStatusRef.current = nextState.status
-      setNow(Date.now())
+      applyStateUpdate(state, { source: 'rest' })
     } catch (err) {
       console.warn('[CANTEEN] Failed to fetch state:', err)
       setError(err?.message || 'Failed to fetch canteen status')
     } finally {
-      setLoading(false)
+      if (!hasResolvedStateRef.current) {
+        setLoading(false)
+      }
     }
-  }, [isConnected])
+  }, [applyStateUpdate, isConnected])
 
   useEffect(() => {
     refresh()
@@ -135,12 +151,18 @@ export function CanteenProvider({ children }) {
   }, [rawState.status])
 
   const remainingMs = useMemo(
-    () => getRemainingMs(rawState.closingSoonUntil),
-    [rawState.closingSoonUntil, now]
+    () =>
+      getRemainingMsForStatus(
+        rawState.status,
+        rawState.closingSoonUntilMs ??
+          parseCanteenTimestamp(rawState.closingSoonUntil)
+      ),
+    [rawState.status, rawState.closingSoonUntilMs, rawState.closingSoonUntil, now]
   )
 
   useEffect(() => {
-    if (!rawState.closingSoonUntil) return undefined
+    if (rawState.status !== CANTEEN_STATUS.OPEN) return undefined
+    if (rawState.closingSoonUntilMs == null) return undefined
     if (remainingMs <= 0) return undefined
 
     const timer = window.setInterval(() => {
@@ -148,7 +170,7 @@ export function CanteenProvider({ children }) {
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [rawState.closingSoonUntil, remainingMs])
+  }, [rawState.status, rawState.closingSoonUntilMs, remainingMs])
 
   const value = useMemo(() => {
     const base = getCanteenView(rawState)
@@ -162,6 +184,7 @@ export function CanteenProvider({ children }) {
       countdown: formatCountdown(remainingMs),
       hasClosingWarning: base.isClosingSoon,
       isOrderingAllowed: base.canOrder,
+      isOperatingAllowed: base.canOperate,
       isConnected,
       lastUpdate,
     }

@@ -212,8 +212,8 @@ apiClient.interceptors.response.use(
     const requestContext = getRequestLogContext(originalRequest)
 
     const message =
-      body?.message ||
       body?.error ||
+      body?.message ||
       error.message ||
       'Something went wrong'
 
@@ -277,7 +277,7 @@ apiClient.interceptors.response.use(
     }
 
     switch (true) {
-      case status === 403:
+      case status === 403 && !onAuthPage && !isPublicAuthEndpoint(url):
         toast.error('You do not have permission to perform this action.')
         break
 

@@ -59,6 +59,12 @@ function ElapsedBadge({ seconds, timeStatus }) {
 }
 
 function getEmptyStateText(activeTab, canteen) {
+  if (canteen.loading) {
+    return activeTab === 'ready'
+      ? 'Checking canteen status for the pickup queue.'
+      : 'Checking canteen status for kitchen operations.'
+  }
+
   if (activeTab === 'ready') {
     if (canteen.isClosed) return 'Canteen is closed. No pickup queue right now.'
     if (canteen.isOpening) return 'Opening soon. Pickup queue will appear once orders begin.'
@@ -83,7 +89,8 @@ function getEmptyStateText(activeTab, canteen) {
 export default function KitchenDashboard() {
   const [activeTab, setActiveTab] = useState('monitor')
   const canteen = useCanteen()
-  const operationalActionsBlocked = canteen.isClosed || canteen.isOpening
+  const operationalActionsBlocked =
+    canteen.loading || !canteen.isOperatingAllowed
 
   const currentScope =
     TAB_CONFIG.find((t) => t.key === activeTab)?.scope ?? 'monitor'
@@ -136,7 +143,9 @@ export default function KitchenDashboard() {
   const handleComplete = async (order) => {
     if (operationalActionsBlocked) {
       toast.error(
-        canteen.isOpening
+        canteen.loading
+          ? 'Checking canteen status. Please wait a moment.'
+          : canteen.isOpening
           ? 'Canteen is opening soon. Completion actions stay disabled until service begins.'
           : 'Canteen is closed. Completion actions are disabled.'
       )
@@ -212,7 +221,8 @@ export default function KitchenDashboard() {
             </span>
           </div>
 
-          {(canteen.isOpening || canteen.isClosing || canteen.isClosed) && (
+          {!canteen.loading &&
+            (canteen.isOpening || canteen.isClosing || canteen.isClosed) && (
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               {canteen.isOpening &&
                 'Opening soon — kitchen can prepare before new orders begin.'}
@@ -352,7 +362,9 @@ export default function KitchenDashboard() {
                       disabled={operationalActionsBlocked}
                       icon="📦"
                     >
-                      {canteen.isOpening
+                      {canteen.loading
+                        ? 'Checking Status...'
+                        : canteen.isOpening
                         ? 'Unavailable Until Open'
                         : canteen.isClosed
                           ? 'Unavailable While Closed'

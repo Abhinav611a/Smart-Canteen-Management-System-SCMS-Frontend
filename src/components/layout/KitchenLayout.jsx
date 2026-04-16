@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useCanteenStatus } from '@/hooks/useCanteenStatus'
 import CanteenBanner from '@/components/ui/CanteenBanner'
+import CanteenReadinessCard from '@/components/ui/CanteenReadinessCard'
 import { testService } from '@/services/testService'
 import {
   ChefHat,
@@ -323,6 +324,7 @@ function OrderCard({
   queuedAction,
   isFlushingQueue,
   canteenActionsBlocked,
+  canteenLoading,
   canteenOpening,
 }) {
   const t = themeMap[mode]
@@ -337,7 +339,8 @@ function OrderCard({
   const elapsed = formatElapsedTime(getElapsedSecondsFromPreparing(order, nowTs))
 
   let buttonText = actionLabel
-  if (canteenOpening) buttonText = 'Unavailable Until Open'
+  if (canteenLoading) buttonText = 'Checking Status...'
+  else if (canteenOpening) buttonText = 'Unavailable Until Open'
   else if (canteenActionsBlocked) buttonText = 'Unavailable While Closed'
   else if (queuedAction && !isConnected) buttonText = 'Queued Offline'
   else if (queuedAction && isFlushingQueue) buttonText = 'Syncing...'
@@ -499,14 +502,25 @@ export default function KitchenLayout() {
   const [queuedActions, setQueuedActions] = useState([])
   const [isFlushingQueue, setIsFlushingQueue] = useState(false)
   const [wasConnectedOnce, setWasConnectedOnce] = useState(false)
+  const [markingReady, setMarkingReady] = useState(false)
+  const [submittedReady, setSubmittedReady] = useState(false)
 
   const prevConnectedRef = useRef(false)
 
   const { logout } = useAuth()
   const navigate = useNavigate()
   const canteen = useCanteenStatus(true)
-  const operationalActionsBlocked = canteen.isClosed || canteen.isOpening
+  const operationalActionsBlocked =
+    canteen.loading || !canteen.isOperatingAllowed
   const t = themeMap[theme]
+
+  useEffect(() => {
+    if (!canteen.isOpening || canteen.kitchenReady) {
+      setSubmittedReady(false)
+    }
+  }, [canteen.isOpening, canteen.kitchenReady])
+
+  const kitchenReadyConfirmed = canteen.kitchenReady || submittedReady
 
   const fetchKitchenOrders = async (showLoader = true) => {
     try {
@@ -692,7 +706,9 @@ export default function KitchenLayout() {
   const handlePromoteStatus = async (orderId, currentStatus) => {
     if (operationalActionsBlocked) {
       toast.error(
-        canteen.isOpening
+        canteen.loading
+          ? 'Checking canteen status. Please wait a moment.'
+          : canteen.isOpening
           ? 'Canteen is opening soon. Kitchen actions stay disabled until service begins.'
           : 'Canteen is closed. Actions are disabled.'
       )
@@ -749,6 +765,26 @@ export default function KitchenLayout() {
     } catch (error) {
       console.error('[WS TEST] Error:', error)
       toast.error('WS test failed')
+    }
+  }
+
+  const handleKitchenReady = async () => {
+    if (!canteen.isOpening || kitchenReadyConfirmed || markingReady) return
+
+    setMarkingReady(true)
+
+    try {
+      await kitchenService.markReady()
+      setSubmittedReady(true)
+      toast.success(
+        canteen.managerReady
+          ? 'Kitchen readiness confirmed. Waiting for canteen to open.'
+          : 'Kitchen readiness confirmed. Waiting for manager readiness.'
+      )
+    } catch (error) {
+      toast.error(error?.message || 'Failed to confirm kitchen readiness.')
+    } finally {
+      setMarkingReady(false)
     }
   }
 
@@ -881,6 +917,21 @@ export default function KitchenLayout() {
               <CanteenBanner />
             </div>
 
+            {canteen.isOpening && (
+              <div className="mb-6">
+                <CanteenReadinessCard
+                  actionLabel="Kitchen Ready"
+                  actionLoadingLabel="Confirming Readiness..."
+                  confirmedLabel="Kitchen Ready"
+                  confirmed={kitchenReadyConfirmed}
+                  managerReady={canteen.managerReady}
+                  kitchenReady={canteen.kitchenReady}
+                  onAction={handleKitchenReady}
+                  loading={markingReady}
+                />
+              </div>
+            )}
+
             {error ? (
               <div className={`mb-6 rounded-2xl p-4 ${t.errorCard}`}>
                 <div className="flex items-center justify-between gap-4">
@@ -949,6 +1000,7 @@ export default function KitchenLayout() {
                     queuedAction={queuedActionsMap[order.id]}
                     isFlushingQueue={isFlushingQueue}
                     canteenActionsBlocked={operationalActionsBlocked}
+                    canteenLoading={canteen.loading}
                     canteenOpening={canteen.isOpening}
                   />
                 ))}

@@ -1,7 +1,7 @@
 import { Client } from '@stomp/stompjs'
 import { BACKEND_URL, ENDPOINTS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
-import { normaliseCanteenState, getCanteenView } from './canteenService'
+import { normaliseCanteenState } from './canteenService'
 
 let client = null
 let connected = false
@@ -30,7 +30,7 @@ function parseOrderMessage(message) {
 function parseCanteenMessage(message) {
   try {
     const raw = JSON.parse(message.body)
-    return getCanteenView(normaliseCanteenState(raw))
+    return normaliseCanteenState(raw)
   } catch (error) {
     console.warn('[WS] Failed to parse canteen payload:', message.body, error)
     return null

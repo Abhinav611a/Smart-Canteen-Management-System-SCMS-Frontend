@@ -44,8 +44,10 @@ export const ENDPOINTS = {
 
   KITCHEN_ORDERS: '/kitchen/orders',
   KITCHEN_ORDER_STATUS: (id) => `/kitchen/orders/${id}/status`,
+  KITCHEN_CANTEEN_READY: '/kitchen/canteen/kitchen-ready',
 
   MANAGER_ORDERS: '/manager/orders',
+  MANAGER_CANTEEN_READY: '/manager/canteen/manager-ready',
   MANAGER_ORDER_COMPLETE: (id) => `/manager/${id}/complete`,
 
   ANALYTICS_REVENUE_DAILY: '/analytics/revenue/daily',

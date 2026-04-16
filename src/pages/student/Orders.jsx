@@ -165,7 +165,8 @@ function AnimatedDetail({ open, children }) {
 export default function StudentOrders() {
   const { orders, loading, error, refetch, applyRealtimeUpdate } =
     useOrders('my')
-  const { isOrderingAllowed, orderBlockedMessage } = useCanteen()
+  const { loading: canteenLoading, isOrderingAllowed, orderBlockedMessage } =
+    useCanteen()
 
   const [expandedId, setExpandedId] = useState(null)
   const [reorderingId, setReorderingId] = useState(null)
@@ -218,6 +219,11 @@ export default function StudentOrders() {
   )
 
   const handleReorder = async (order) => {
+    if (canteenLoading) {
+      toast.error('Checking canteen status. Please wait a moment.')
+      return
+    }
+
     if (!isOrderingAllowed) {
       toast.error(
         orderBlockedMessage || 'Canteen is not accepting new orders right now.'
@@ -544,7 +550,9 @@ export default function StudentOrders() {
                       >
                         {reorderingId === order.id
                           ? 'Reordering...'
-                          : !isOrderingAllowed
+                          : canteenLoading
+                            ? 'Checking Status...'
+                            : !isOrderingAllowed
                             ? 'Reorder Unavailable'
                             : 'Reorder'}
                       </button>

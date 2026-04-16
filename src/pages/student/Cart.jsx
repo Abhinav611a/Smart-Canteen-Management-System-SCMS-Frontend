@@ -17,6 +17,7 @@ const PAYMENT_METHODS = [
 export default function StudentCart() {
   const navigate = useNavigate()
   const {
+    loading: canteenLoading,
     isOrderingAllowed,
     orderBlockedMessage,
     checkoutActionLabel,
@@ -74,6 +75,11 @@ export default function StudentCart() {
   }
 
   const handlePlaceOrder = async () => {
+    if (canteenLoading) {
+      toast.error('Checking canteen status. Please wait a moment.')
+      return
+    }
+
     if (!isOrderingAllowed) {
       toast.error(
         orderBlockedMessage || 'Canteen is not accepting new orders right now.'
@@ -314,7 +320,7 @@ export default function StudentCart() {
         </div>
       </div>
 
-      {!isOrderingAllowed && (
+      {!canteenLoading && !isOrderingAllowed && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10">
           <p className="font-semibold text-amber-900 dark:text-amber-200">
             {orderNoticeTitle}
@@ -459,7 +465,9 @@ export default function StudentCart() {
           disabled={placing || syncing || !isOrderingAllowed}
           className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {!isOrderingAllowed
+          {canteenLoading
+            ? 'Checking Status...'
+            : !isOrderingAllowed
             ? checkoutActionLabel
             : placing
               ? 'Placing Order…'

@@ -32,6 +32,10 @@ export const managerService = {
     return unwrapListResponse(raw).map(normaliseOrder)
   },
 
+  async markReady() {
+    return api.post(ENDPOINTS.MANAGER_CANTEEN_READY)
+  },
+
   async complete(orderId) {
     const raw = await api.patch(ENDPOINTS.MANAGER_ORDER_COMPLETE(orderId))
     return normaliseOrder(unwrapItemResponse(raw))

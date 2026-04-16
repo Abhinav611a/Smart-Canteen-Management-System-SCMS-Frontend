@@ -64,4 +64,8 @@ export const kitchenService = {
   async updateStatus(orderId, status) {
     return this.updateOrderStatus(orderId, status)
   },
+
+  async markReady() {
+    return api.post(ENDPOINTS.KITCHEN_CANTEEN_READY)
+  },
 }

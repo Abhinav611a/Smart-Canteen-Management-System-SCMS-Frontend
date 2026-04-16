@@ -24,6 +24,7 @@ export default function StudentMenu() {
   const { addItem, removeItem, items: cartItems } = useCart()
   const { menu, loading, error } = useMenu()
   const {
+    loading: canteenLoading,
     isOrderingAllowed,
     orderBlockedMessage,
     orderActionLabel,
@@ -69,6 +70,11 @@ export default function StudentMenu() {
   )
 
   const handleAdd = async (item) => {
+    if (canteenLoading) {
+      toast.error('Checking canteen status. Please wait a moment.')
+      return
+    }
+
     if (!isOrderingAllowed) {
       toast.error(
         orderBlockedMessage || 'Canteen is not accepting new orders right now.'
@@ -122,7 +128,7 @@ export default function StudentMenu() {
           </div>
         </div>
 
-        {!isOrderingAllowed && (
+        {!canteenLoading && !isOrderingAllowed && (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10">
             <p className="font-semibold text-amber-900 dark:text-amber-200">
               {orderNoticeTitle}
@@ -334,7 +340,11 @@ export default function StudentMenu() {
                         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
                       >
                         <Plus size={16} />
-                        {isOrderingAllowed ? 'Add to Cart' : orderActionLabel}
+                        {canteenLoading
+                          ? 'Checking Status...'
+                          : isOrderingAllowed
+                            ? 'Add to Cart'
+                            : orderActionLabel}
                       </button>
                     )}
                   </div>
