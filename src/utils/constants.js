@@ -50,6 +50,8 @@ export const ENDPOINTS = {
   MANAGER_ORDERS: '/manager/orders',
   MANAGER_CANTEEN_READY: '/manager/canteen/manager-ready',
   MANAGER_ORDER_COMPLETE: (id) => `/manager/${id}/complete`,
+  MANAGER_SCANNER_SESSION: '/manager/scanner-session',
+  MANAGER_SCANNER_SESSION_VALIDATE: '/manager/scanner-session/validate',
 
   ANALYTICS_REVENUE_DAILY: '/analytics/revenue/daily',
   ANALYTICS_REVENUE_WEEKLY: '/analytics/revenue/weekly',
@@ -161,6 +163,7 @@ export const LS_KEYS = {
   USER: `${STORAGE_PREFIX}_user`,
   REFRESH_TOKEN: `${STORAGE_PREFIX}_refresh_token`,
   TOKEN_EXPIRY: `${STORAGE_PREFIX}_token_expiry`,
+  MANAGER_SCANNER_SESSION: `${STORAGE_PREFIX}_manager_scanner_session`,
   THEME: 'canteen_theme',
   CART: 'canteen_cart',
 }

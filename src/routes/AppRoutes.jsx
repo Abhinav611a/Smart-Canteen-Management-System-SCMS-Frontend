@@ -28,6 +28,7 @@ const OrderInvoices = lazy(() => import('@/pages/student/OrderInvoices'))
 const ChefLayout = lazy(() => import('@/components/layout/ChefLayout'))
 const ChefOrders = lazy(() => import('@/pages/chef/ChefOrders'))
 const ChefMenu = lazy(() => import('@/pages/chef/ChefMenu'))
+const ExternalScanner = lazy(() => import('@/pages/manager/ExternalScanner'))
 
 // Kitchen
 const KitchenLayout = lazy(() => import('@/components/layout/KitchenLayout'))
@@ -130,6 +131,7 @@ export default function AppRoutes() {
           />
 
           <Route path="/oauth-success" element={<OAuthSuccess />} />
+          <Route path="/manager/external-scanner" element={<ExternalScanner />} />
 
           <Route
             path="/student"

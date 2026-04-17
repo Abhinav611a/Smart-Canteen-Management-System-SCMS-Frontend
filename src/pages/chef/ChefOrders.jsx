@@ -13,6 +13,7 @@ import { useWebSocket } from '@/hooks/useWebSocket'
 import { useNotifications } from '@/context/NotificationContext'
 import { useCanteen } from '@/context/CanteenContext'
 import { ordersService } from '@/services/orders'
+import { managerScannerService } from '@/services/managerScannerService'
 import {
   MENU_CATEGORY_EMOJIS,
   ORDER_STATUS,
@@ -23,6 +24,7 @@ import {
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import Button from '@/components/ui/Button'
 import QRScannerModal from '@/components/ui/QRScannerModal'
+import ManagerPhoneScannerModal from '@/components/ui/ManagerPhoneScannerModal'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
 const TAB_CONFIG = [
@@ -94,6 +96,13 @@ function getEmptyStateText(activeTab, canteen) {
 export default function ChefOrders() {
   const [activeTab, setActiveTab] = useState('monitor')
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [phoneScannerOpen, setPhoneScannerOpen] = useState(false)
+  const [phoneScannerLoading, setPhoneScannerLoading] = useState(false)
+  const [disconnectingPhoneScanner, setDisconnectingPhoneScanner] =
+    useState(false)
+  const [phoneScannerSession, setPhoneScannerSession] = useState(() =>
+    managerScannerService.getStoredSession(),
+  )
   const canteen = useCanteen()
   const operationalActionsBlocked =
     canteen.loading || !canteen.isOperatingAllowed
@@ -135,6 +144,41 @@ export default function ChefOrders() {
   const handleVerifyQr = useCallback(async (code) => {
     return await ordersService.verifyOrder(code)
   }, [])
+
+  const handleOpenPhoneScanner = async () => {
+    if (phoneScannerSession?.token && phoneScannerSession?.scannerUrl) {
+      setPhoneScannerOpen(true)
+      return
+    }
+
+    setPhoneScannerLoading(true)
+
+    try {
+      const session = await managerScannerService.createSession()
+      setPhoneScannerSession(session)
+      setPhoneScannerOpen(true)
+      toast.success('Phone scanner connected.')
+    } catch (error) {
+      toast.error(error?.message || 'Failed to create phone scanner session.')
+    } finally {
+      setPhoneScannerLoading(false)
+    }
+  }
+
+  const handleDisconnectPhoneScanner = async () => {
+    setDisconnectingPhoneScanner(true)
+
+    try {
+      await managerScannerService.disconnectSession()
+      setPhoneScannerSession(null)
+      setPhoneScannerOpen(false)
+      toast.success('Phone scanner disconnected.')
+    } catch (error) {
+      toast.error(error?.message || 'Failed to disconnect phone scanner.')
+    } finally {
+      setDisconnectingPhoneScanner(false)
+    }
+  }
 
   const handleComplete = async (order) => {
     if (operationalActionsBlocked) {
@@ -229,6 +273,13 @@ export default function ChefOrders() {
                   'Canteen closed - operational actions are limited.'}
               </p>
             )}
+
+          {phoneScannerSession?.scannerUrl && (
+            <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              Phone scanner connected. It stays active until you disconnect it
+              or log out.
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -240,6 +291,32 @@ export default function ChefOrders() {
           >
             Scan QR
           </Button>
+
+          <Button
+            variant={phoneScannerSession ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              void handleOpenPhoneScanner()
+            }}
+            loading={phoneScannerLoading}
+            disabled={disconnectingPhoneScanner}
+          >
+            {phoneScannerSession ? 'Phone Scanner' : 'Connect Phone Scanner'}
+          </Button>
+
+          {phoneScannerSession && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                void handleDisconnectPhoneScanner()
+              }}
+              loading={disconnectingPhoneScanner}
+              disabled={phoneScannerLoading}
+            >
+              Disconnect
+            </Button>
+          )}
 
           <Button
             variant="ghost"
@@ -390,6 +467,16 @@ export default function ChefOrders() {
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onVerify={handleVerifyQr}
+      />
+
+      <ManagerPhoneScannerModal
+        open={phoneScannerOpen}
+        onClose={() => setPhoneScannerOpen(false)}
+        session={phoneScannerSession}
+        onDisconnect={() => {
+          void handleDisconnectPhoneScanner()
+        }}
+        disconnecting={disconnectingPhoneScanner}
       />
     </div>
   )

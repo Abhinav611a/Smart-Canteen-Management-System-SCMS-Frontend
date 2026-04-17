@@ -10,6 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { authService } from '@/services/auth'
+import { managerScannerService } from '@/services/managerScannerService'
 import {
   apiClient,
   refreshAccessTokenSilently,
@@ -481,7 +482,27 @@ export function AuthProvider({ children }) {
     [connectWebSocket, startSilentRefresh]
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const currentUser = state.user
+    const currentRole = sanitizeRole(currentUser?.role)
+
+    if (currentRole === 'MANAGER') {
+      try {
+        await managerScannerService.disconnectSession({ clearStoredOnFailure: true })
+      } catch (error) {
+        console.warn('[AUTH] Failed to revoke manager scanner session:', error)
+        managerScannerService.clearStoredSession()
+      }
+    } else {
+      managerScannerService.clearStoredSession()
+    }
+
+    try {
+      await authService.logout()
+    } catch (error) {
+      console.warn('[AUTH] Logout request failed:', error)
+    }
+
     clearStoredAuth()
     websocketService.disconnect()
     wsTriedRef.current = false
@@ -489,7 +510,7 @@ export function AuthProvider({ children }) {
 
     dispatch({ type: 'LOGOUT' })
     navigate('/login', { replace: true })
-  }, [navigate])
+  }, [navigate, state.user])
 
   return (
     <AuthContext.Provider
