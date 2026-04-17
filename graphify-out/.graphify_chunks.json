@@ -1,0 +1,132 @@
+[
+  {
+    "chunk_num": 1,
+    "total_chunks": 5,
+    "files": [
+      "src\\App.jsx",
+      "src\\main.jsx",
+      "src\\polyfills.js",
+      "src\\components\\charts\\OrdersBarChart.jsx",
+      "src\\components\\charts\\RevenueAreaChart.jsx",
+      "src\\components\\layout\\AdminLayout.jsx",
+      "src\\components\\layout\\ChefLayout.jsx",
+      "src\\components\\layout\\KitchenLayout.jsx",
+      "src\\components\\layout\\Sidebar.jsx",
+      "src\\components\\layout\\StudentLayout.jsx",
+      "src\\components\\layout\\Topbar.jsx",
+      "src\\components\\ui\\Badge.jsx",
+      "src\\components\\ui\\Button.jsx",
+      "src\\components\\ui\\CanteenBanner.jsx",
+      "src\\components\\ui\\CanteenReadinessCard.jsx",
+      "src\\components\\ui\\Drawer.jsx",
+      "src\\components\\ui\\ErrorBoundary.jsx",
+      "src\\components\\ui\\Input.jsx",
+      "src\\components\\ui\\InvoicePreviewModal.jsx",
+      "src\\components\\ui\\ManagerPhoneScannerModal.jsx",
+      "src\\components\\ui\\Modal.jsx",
+      "src\\components\\ui\\NotificationBell.jsx"
+    ],
+    "file_types": [
+      "code"
+    ]
+  },
+  {
+    "chunk_num": 2,
+    "total_chunks": 5,
+    "files": [
+      "src\\components\\ui\\PageLoader.jsx",
+      "src\\components\\ui\\Pagination.jsx",
+      "src\\components\\ui\\QRScannerModal.jsx",
+      "src\\components\\ui\\RatingModal.jsx",
+      "src\\components\\ui\\Skeleton.jsx",
+      "src\\components\\ui\\StarRating.jsx",
+      "src\\components\\ui\\StatCard.jsx",
+      "src\\components\\ui\\ThemeToggle.jsx",
+      "src\\components\\ui\\WalletButton.jsx",
+      "src\\context\\AuthContext.jsx",
+      "src\\context\\BlockchainContext.jsx",
+      "src\\context\\CanteenContext.jsx",
+      "src\\context\\CartContext.jsx",
+      "src\\context\\NotificationContext.jsx",
+      "src\\context\\ThemeContext.jsx",
+      "src\\hooks\\useAnalytics.js",
+      "src\\hooks\\useCanteenStatus.js",
+      "src\\hooks\\useDebounce.js",
+      "src\\hooks\\useLocalStorage.js",
+      "src\\hooks\\useMenu.js",
+      "src\\hooks\\useOrders.js",
+      "src\\hooks\\usePagination.js"
+    ],
+    "file_types": [
+      "code"
+    ]
+  },
+  {
+    "chunk_num": 3,
+    "total_chunks": 5,
+    "files": [
+      "src\\hooks\\useWebSocket.js",
+      "src\\pages\\NotFound.jsx",
+      "src\\pages\\admin\\AdminAnalytics.jsx",
+      "src\\pages\\admin\\AdminDashboard.jsx",
+      "src\\pages\\admin\\AdminLayout.jsx",
+      "src\\pages\\admin\\AdminMenu.jsx",
+      "src\\pages\\admin\\AdminOrders.jsx",
+      "src\\pages\\admin\\AdminUsers.jsx",
+      "src\\pages\\admin\\CanteenToggle.jsx",
+      "src\\pages\\auth\\Login.jsx",
+      "src\\pages\\auth\\OAuthSuccess.jsx",
+      "src\\pages\\auth\\Register.jsx",
+      "src\\pages\\chef\\ChefMenu.jsx",
+      "src\\pages\\chef\\ChefOrders.jsx",
+      "src\\pages\\kitchen\\KitchenDashboard.jsx",
+      "src\\pages\\manager\\ExternalScanner.jsx",
+      "src\\pages\\student\\Cart.jsx",
+      "src\\pages\\student\\Menu.jsx",
+      "src\\pages\\student\\OrderInvoices.jsx",
+      "src\\pages\\student\\Orders.jsx",
+      "src\\pages\\student\\Profile.jsx"
+    ],
+    "file_types": [
+      "code"
+    ]
+  },
+  {
+    "chunk_num": 4,
+    "total_chunks": 5,
+    "files": [
+      "src\\routes\\AppRoutes.jsx",
+      "src\\services\\analytics.js",
+      "src\\services\\api.js",
+      "src\\services\\auth.js",
+      "src\\services\\canteenService.js",
+      "src\\services\\cartService.js",
+      "src\\services\\kitchenService.js",
+      "src\\services\\managerScannerService.js",
+      "src\\services\\managerService.js",
+      "src\\services\\menu.js",
+      "src\\services\\orders.js",
+      "src\\services\\ratingService.js",
+      "src\\services\\testService.js",
+      "src\\services\\websocketService.js",
+      "src\\utils\\cart.js",
+      "src\\utils\\constants.js",
+      "src\\utils\\dummyData.js",
+      "src\\utils\\helpers.js",
+      "src\\utils\\validators.js"
+    ],
+    "file_types": [
+      "code"
+    ]
+  },
+  {
+    "chunk_num": 5,
+    "total_chunks": 5,
+    "files": [
+      "src\\assets\\logo.svg"
+    ],
+    "file_types": [
+      "image"
+    ]
+  }
+]

@@ -1,0 +1,471 @@
+{
+  "nodes": [
+    {
+      "id": "app_app",
+      "label": "App",
+      "file_type": "code",
+      "source_file": "src/App.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "main_main",
+      "label": "Main Entry",
+      "file_type": "code",
+      "source_file": "src/main.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "polyfills_polyfills",
+      "label": "Polyfills",
+      "file_type": "code",
+      "source_file": "src/polyfills.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ordersbarchart_ordersbarchart",
+      "label": "Orders Bar Chart",
+      "file_type": "code",
+      "source_file": "src/components/charts/OrdersBarChart.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "revenueareachart_revenueareachart",
+      "label": "Revenue Area Chart",
+      "file_type": "code",
+      "source_file": "src/components/charts/RevenueAreaChart.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adminlayout_adminlayout",
+      "label": "Admin Layout",
+      "file_type": "code",
+      "source_file": "src/components/layout/AdminLayout.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "cheflayout_cheflayout",
+      "label": "Chef Layout",
+      "file_type": "code",
+      "source_file": "src/components/layout/ChefLayout.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "kitchenlayout_kitchenlayout",
+      "label": "Kitchen Layout",
+      "file_type": "code",
+      "source_file": "src/components/layout/KitchenLayout.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sidebar_sidebar",
+      "label": "Sidebar",
+      "file_type": "code",
+      "source_file": "src/components/layout/Sidebar.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "studentlayout_studentlayout",
+      "label": "Student Layout",
+      "file_type": "code",
+      "source_file": "src/components/layout/StudentLayout.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "topbar_topbar",
+      "label": "Topbar",
+      "file_type": "code",
+      "source_file": "src/components/layout/Topbar.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "badge_badge",
+      "label": "Badge",
+      "file_type": "code",
+      "source_file": "src/components/ui/Badge.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "button_button",
+      "label": "Button",
+      "file_type": "code",
+      "source_file": "src/components/ui/Button.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "canteenbanner_canteenbanner",
+      "label": "Canteen Banner",
+      "file_type": "code",
+      "source_file": "src/components/ui/CanteenBanner.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "canteenreadinesscard_canteenreadinesscard",
+      "label": "Canteen Readiness Card",
+      "file_type": "code",
+      "source_file": "src/components/ui/CanteenReadinessCard.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "drawer_drawer",
+      "label": "Drawer",
+      "file_type": "code",
+      "source_file": "src/components/ui/Drawer.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "errorboundary_errorboundary",
+      "label": "Error Boundary",
+      "file_type": "code",
+      "source_file": "src/components/ui/ErrorBoundary.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "input_input",
+      "label": "Input",
+      "file_type": "code",
+      "source_file": "src/components/ui/Input.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "invoicepreviewmodal_invoicepreviewmodal",
+      "label": "Invoice Preview Modal",
+      "file_type": "code",
+      "source_file": "src/components/ui/InvoicePreviewModal.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "managerphonescannermodal_managerphonescannermodal",
+      "label": "Manager Phone Scanner Modal",
+      "file_type": "code",
+      "source_file": "src/components/ui/ManagerPhoneScannerModal.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "modal_modal",
+      "label": "Modal",
+      "file_type": "code",
+      "source_file": "src/components/ui/Modal.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "notificationbell_notificationbell",
+      "label": "Notification Bell",
+      "file_type": "code",
+      "source_file": "src/components/ui/NotificationBell.jsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "main_main",
+      "target": "app_app",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/main.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "adminlayout_adminlayout",
+      "target": "sidebar_sidebar",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/AdminLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "adminlayout_adminlayout",
+      "target": "topbar_topbar",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/AdminLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "cheflayout_cheflayout",
+      "target": "sidebar_sidebar",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/ChefLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "cheflayout_cheflayout",
+      "target": "topbar_topbar",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/ChefLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "cheflayout_cheflayout",
+      "target": "canteenbanner_canteenbanner",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/ChefLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "cheflayout_cheflayout",
+      "target": "canteenreadinesscard_canteenreadinesscard",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/ChefLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "kitchenlayout_kitchenlayout",
+      "target": "canteenbanner_canteenbanner",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/KitchenLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "kitchenlayout_kitchenlayout",
+      "target": "canteenreadinesscard_canteenreadinesscard",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/KitchenLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "studentlayout_studentlayout",
+      "target": "sidebar_sidebar",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/StudentLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "studentlayout_studentlayout",
+      "target": "topbar_topbar",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/StudentLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "studentlayout_studentlayout",
+      "target": "canteenbanner_canteenbanner",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/StudentLayout.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "topbar_topbar",
+      "target": "notificationbell_notificationbell",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/layout/Topbar.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "canteenreadinesscard_canteenreadinesscard",
+      "target": "button_button",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ui/CanteenReadinessCard.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoicepreviewmodal_invoicepreviewmodal",
+      "target": "button_button",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ui/InvoicePreviewModal.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "managerphonescannermodal_managerphonescannermodal",
+      "target": "modal_modal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ui/ManagerPhoneScannerModal.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "managerphonescannermodal_managerphonescannermodal",
+      "target": "button_button",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ui/ManagerPhoneScannerModal.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "drawer_drawer",
+      "target": "modal_modal",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/components/ui/Drawer.jsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ordersbarchart_ordersbarchart",
+      "target": "revenueareachart_revenueareachart",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.86,
+      "source_file": "src/components/charts/OrdersBarChart.jsx",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "shared_app_shell",
+      "label": "Shared App Shell",
+      "nodes": [
+        "adminlayout_adminlayout",
+        "cheflayout_cheflayout",
+        "studentlayout_studentlayout",
+        "sidebar_sidebar",
+        "topbar_topbar"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.88,
+      "source_file": "src/components/layout/AdminLayout.jsx"
+    },
+    {
+      "id": "canteen_opening_readiness_flow",
+      "label": "Canteen Opening Readiness Flow",
+      "nodes": [
+        "cheflayout_cheflayout",
+        "kitchenlayout_kitchenlayout",
+        "canteenbanner_canteenbanner",
+        "canteenreadinesscard_canteenreadinesscard"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/components/layout/ChefLayout.jsx"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
