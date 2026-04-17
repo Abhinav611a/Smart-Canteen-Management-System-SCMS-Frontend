@@ -284,7 +284,7 @@ function createOrderItemCandidates(cartItems = []) {
 export function buildOrderItems(cartItems = []) {
   return createOrderItemCandidates(cartItems)
     .filter((item) => item.issues.length === 0)
-    .map(({ rawItem, issues, ...item }) => item)
+    .map(({ rawItem: _rawItem, issues: _issues, ...item }) => item)
 }
 
 function getDroppedCheckoutItems(cartItems = []) {
@@ -468,7 +468,7 @@ export const cartService = {
       return cart
     } catch (error) {
       if (isCartMissingError(error)) {
-        return { id: null, items: [], total: 0, count: 0 }
+        return { id: null, items: [], total: 0, count: 0, amount: 0 }
       }
       throw error
     }
@@ -494,7 +494,7 @@ export const cartService = {
     return this.getCart()
   },
 
-  async clearCart(items = []) {
+  async clearCart(items = [], { refetch = true } = {}) {
     const results = await Promise.allSettled(
       items.map((item) => {
         const cartItemId = item.cartItemId ?? item.id
@@ -502,8 +502,13 @@ export const cartService = {
       }),
     )
 
-    const cart = await this.getCart()
     const failed = results.find((result) => result.status === 'rejected')
+
+    if (!refetch && !failed) {
+      return { id: null, items: [], total: 0, count: 0, amount: 0 }
+    }
+
+    const cart = await this.getCart()
 
     if (failed && cart.items.length > 0) {
       const reason = failed.reason

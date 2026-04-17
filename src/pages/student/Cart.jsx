@@ -81,6 +81,19 @@ export default function StudentCart() {
     toast.error(message)
   }
 
+  const syncCartAfterOrder = async () => {
+    await clearCart({ refetch: false, silent: true })
+
+    try {
+      await refreshCart({ silent: true })
+    } catch (syncError) {
+      console.error('Failed to sync cart after order placement:', syncError)
+      toast.error(
+        'Order placed, but cart sync could not be confirmed. Please refresh your cart once.',
+      )
+    }
+  }
+
   const handleDecreaseQty = async (item) => {
     try {
       await updateQty(item.id, item.qty - 1)
@@ -146,19 +159,19 @@ export default function StudentCart() {
 
       const order = await cartService.checkout({ paymentMethod })
       const placedPaymentMethod = order?.paymentMethod ?? paymentMethod
-
-      await refreshCart({ silent: true })
-
-      setPlaced({
+      const placedOrder = {
         ...order,
         paymentMethod: placedPaymentMethod,
-      })
+      }
+
+      setPlaced(placedOrder)
+      await syncCartAfterOrder()
 
       addNotification({
         type: 'order',
         title: 'Order Placed! 🎉',
         message: `${
-          order?.orderNumber || `#${order?.id}` || 'Your order'
+          placedOrder.orderNumber || `#${placedOrder.id}` || 'Your order'
         } is being prepared.`,
         icon: '🍽',
       })
@@ -378,8 +391,8 @@ export default function StudentCart() {
             Cart Sync Warning
           </p>
           <p className="mt-1 text-red-700 dark:text-red-300">
-            Your cart could not be confirmed with the server. Click the "Sync"
-            button above before placing your order.
+            Your cart could not be confirmed with the server. Click Sync above
+            before placing your order.
           </p>
         </div>
       )}

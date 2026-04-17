@@ -27,6 +27,7 @@ const initialState = {
   dirty: false,
   outOfSync: false,
 }
+const EMPTY_CART = { id: null, items: [], total: 0, count: 0, amount: 0 }
 
 function cartReducer(state, action) {
   switch (action.type) {
@@ -81,7 +82,7 @@ function cartReducer(state, action) {
               ),
       }
 
-    case 'CLEAR':
+    case 'CLEAR_CART':
       return { ...state, items: [] }
 
     default:
@@ -91,19 +92,21 @@ function cartReducer(state, action) {
 
 function buildCartSummary(items = []) {
   const safeItems = normaliseCartItems(items)
+  const total = safeItems.reduce(
+    (sum, item) =>
+      sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
+    0,
+  )
 
   return {
     id: null,
     items: safeItems,
-    total: safeItems.reduce(
-      (sum, item) =>
-        sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
-      0,
-    ),
+    total,
     count: safeItems.reduce(
       (sum, item) => sum + (item.qty || item.quantity || 0),
       0,
     ),
+    amount: total,
   }
 }
 
@@ -135,6 +138,16 @@ export function CartProvider({ children }) {
   const clearPersistedLocalCart = useCallback(() => {
     localStorage.removeItem(LS_KEYS.CART)
   }, [])
+
+  const clearCartState = useCallback(() => {
+    dispatch({ type: 'CLEAR_CART' })
+    dispatch({
+      type: 'SET_STATUS',
+      value: { outOfSync: false },
+    })
+    clearPersistedLocalCart()
+    return EMPTY_CART
+  }, [clearPersistedLocalCart])
 
   const syncActivityFlags = useCallback(() => {
     dispatch({
@@ -217,7 +230,7 @@ export function CartProvider({ children }) {
         const isBackend500 = status === 500
 
         if (isCartMissing || isBackend500) {
-          const emptyCart = { id: null, items: [], total: 0, count: 0 }
+          const emptyCart = { id: null, items: [], total: 0, count: 0, amount: 0 }
           return apply ? applyCart(emptyCart) : emptyCart
         }
 
@@ -267,14 +280,9 @@ export function CartProvider({ children }) {
     if (isAuthenticated && isCartRole) {
       syncFromBackend({ silent: true }).catch(() => null)
     } else {
-      dispatch({ type: 'CLEAR' })
-      dispatch({
-        type: 'SET_STATUS',
-        value: { outOfSync: false },
-      })
-      clearPersistedLocalCart()
+      clearCartState()
     }
-  }, [clearPersistedLocalCart, isAuthenticated, isCartRole, syncFromBackend])
+  }, [clearCartState, isAuthenticated, isCartRole, syncFromBackend])
 
   const runCartMutation = useCallback(
     async (operation, fallbackOperation, failureMessage) => {
@@ -408,25 +416,59 @@ export function CartProvider({ children }) {
     ],
   )
 
-  const clearCart = useCallback(async () => {
-    const currentItems = itemsRef.current
+  const clearCart = useCallback(
+    async ({ refetch = true, silent = false } = {}) => {
+      const clearLocalOnly = refetch === false
 
-    if (!currentItems.length) {
-      dispatch({ type: 'CLEAR' })
-      dispatch({
-        type: 'SET_STATUS',
-        value: { outOfSync: false },
-      })
-      clearPersistedLocalCart()
-      return { id: null, items: [], total: 0, count: 0 }
-    }
+      if (
+        !clearLocalOnly &&
+        (mutationCountRef.current > 0 || fetchCountRef.current > 0)
+      ) {
+        return null
+      }
 
-    return runCartMutation(
-      () => cartService.clearCart(currentItems),
-      () => dispatch({ type: 'CLEAR' }),
-      'Failed to clear cart.',
-    )
-  }, [clearPersistedLocalCart, runCartMutation])
+      const currentItems = normaliseCartItems(itemsRef.current)
+
+      if (!currentItems.length) {
+        return clearCartState()
+      }
+
+      if (clearLocalOnly) {
+        clearCartState()
+        return EMPTY_CART
+      }
+
+      if (!cartService.isBackendEnabled() || !isCartRole) {
+        clearCartState()
+        return EMPTY_CART
+      }
+
+      const previousCart = buildCartSummary(currentItems)
+
+      clearCartState()
+      beginMutation()
+
+      try {
+        const updatedCart = await cartService.clearCart(currentItems, { refetch })
+        return applyCart(updatedCart)
+      } catch (error) {
+        if (error?.latestCart) {
+          applyCart(error.latestCart, { outOfSync: true })
+        } else {
+          applyCart(previousCart, { outOfSync: true })
+        }
+
+        if (!silent) {
+          toast.error(error.message || 'Failed to clear cart.')
+        }
+
+        throw error
+      } finally {
+        endMutation()
+      }
+    },
+    [applyCart, beginMutation, clearCartState, endMutation, isCartRole],
+  )
 
   const total = state.items.reduce(
     (sum, item) =>
