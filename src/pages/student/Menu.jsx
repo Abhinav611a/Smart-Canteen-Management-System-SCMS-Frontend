@@ -48,7 +48,36 @@ export default function StudentMenu() {
     })
   }, [menu, search, category])
 
-  const cartQty = (id) => cartItems.find((i) => i.id === id)?.qty || 0
+  const cartEntriesByMenuItemId = useMemo(
+    () =>
+      cartItems.reduce((map, cartItem) => {
+        const menuItemId = Number(cartItem.foodItemId ?? cartItem.id)
+
+        if (!Number.isFinite(menuItemId) || menuItemId <= 0) {
+          return map
+        }
+
+        const quantity = cartItem.qty || cartItem.quantity || 0
+        const existing = map.get(menuItemId)
+
+        if (existing) {
+          existing.qty += quantity
+          return map
+        }
+
+        map.set(menuItemId, {
+          qty: quantity,
+          cartItemId: cartItem.id,
+        })
+
+        return map
+      }, new Map()),
+    [cartItems]
+  )
+
+  const getCartEntry = (id) => cartEntriesByMenuItemId.get(Number(id)) ?? null
+
+  const cartQty = (id) => getCartEntry(id)?.qty || 0
 
   const cartItemCount = useMemo(
     () => cartItems.reduce((sum, item) => sum + (item.qty || 0), 0),
@@ -100,11 +129,12 @@ export default function StudentMenu() {
   }
 
   const handleDecrease = async (item) => {
-    const qty = cartQty(item.id)
+    const cartEntry = getCartEntry(item.id)
+    const qty = cartEntry?.qty || 0
     if (qty <= 0) return
 
     try {
-      const updatedCart = await removeItem(item.id)
+      const updatedCart = await removeItem(cartEntry?.cartItemId ?? item.id)
       if (!updatedCart) return
 
       if (qty === 1) {
