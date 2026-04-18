@@ -108,8 +108,8 @@ export function createCartSnapshot(cartLike = []) {
   return items
     .map(normaliseCartItem)
     .map((item) => ({
-      cartItemId: String(item.cartItemId ?? ''),
-      foodItemId: String(item.foodItemId ?? item.id ?? ''),
+      cartItemId: String(item.id ?? item.cartItemId ?? ''),
+      foodItemId: String(item.foodItemId ?? ''),
       qty: Number(item.qty ?? item.quantity ?? 0),
       price: Number(item.price ?? 0),
     }))
@@ -221,6 +221,7 @@ function getCheckoutItemName(item = {}) {
 
 function getCheckoutItemCartRowId(item = {}) {
   return (
+    toOptionalNumber(item?.id) ??
     toOptionalNumber(item?.cartItemId) ??
     toOptionalNumber(item?.cartItem?.id) ??
     null
@@ -228,30 +229,11 @@ function getCheckoutItemCartRowId(item = {}) {
 }
 
 function getCheckoutFoodItemId(item = {}) {
-  const directFoodItemId =
-    toOptionalNumber(item?.foodItemId) ?? toOptionalNumber(item?.foodId)
-
-  if (directFoodItemId !== null) {
-    return directFoodItemId
-  }
-
-  const nestedFoodItemId = getNestedFoodItemId(item)
-  if (nestedFoodItemId !== null) {
-    return nestedFoodItemId
-  }
-
-  const rawItemId = toOptionalNumber(item?.id)
-  const cartRowId = getCheckoutItemCartRowId(item)
-
-  if (rawItemId === null) {
-    return null
-  }
-
-  if (cartRowId !== null && rawItemId === cartRowId) {
-    return null
-  }
-
-  return rawItemId
+  return (
+    toOptionalNumber(item?.foodItemId) ??
+    toOptionalNumber(item?.foodId) ??
+    getNestedFoodItemId(item)
+  )
 }
 
 function createOrderItemCandidates(cartItems = []) {
@@ -483,52 +465,40 @@ export const cartService = {
   },
 
   async updateItem(item, quantity) {
-    const foodItemId = Number(
-      item?.foodItemId ??
-        item?.foodItem?.id ??
-        item?.id,
-    )
+    const cartItemId = Number(item?.id)
 
-    if (!foodItemId || foodItemId <= 0) {
-      console.error('Invalid foodItemId for cart update:', item)
-      throw new Error('Invalid foodItemId for cart update')
+    if (!cartItemId || cartItemId <= 0) {
+      console.error('Invalid cartItemId for cart update:', item)
+      throw new Error('Invalid cartItemId for cart update')
     }
 
-    await api.put(ENDPOINTS.CART_ITEM(foodItemId), { quantity })
+    await api.put(ENDPOINTS.CART_ITEM(cartItemId), { quantity })
     return this.getCart()
   },
 
   async removeItem(item) {
-    const foodItemId = Number(
-      item?.foodItemId ??
-        item?.foodItem?.id ??
-        item?.id,
-    )
+    const cartItemId = Number(item?.id)
 
-    if (!foodItemId || foodItemId <= 0) {
-      console.error('Invalid foodItemId for cart remove:', item)
-      throw new Error('Invalid foodItemId for cart remove')
+    if (!cartItemId || cartItemId <= 0) {
+      console.error('Invalid cartItemId for cart remove:', item)
+      throw new Error('Invalid cartItemId for cart remove')
     }
 
-    await api.delete(ENDPOINTS.CART_ITEM(foodItemId))
+    await api.delete(ENDPOINTS.CART_ITEM(cartItemId))
     return this.getCart()
   },
 
   async clearCart(items = [], { refetch = true } = {}) {
     const results = await Promise.allSettled(
       items.map((item) => {
-        const foodItemId = Number(
-          item?.foodItemId ??
-            item?.foodItem?.id ??
-            item?.id,
-        )
+        const cartItemId = Number(item?.id)
 
-        if (!foodItemId || foodItemId <= 0) {
-          console.error('Invalid foodItemId for cart clear:', item)
-          throw new Error('Invalid foodItemId for cart clear')
+        if (!cartItemId || cartItemId <= 0) {
+          console.error('Invalid cartItemId for cart clear:', item)
+          throw new Error('Invalid cartItemId for cart clear')
         }
 
-        return api.delete(ENDPOINTS.CART_ITEM(foodItemId))
+        return api.delete(ENDPOINTS.CART_ITEM(cartItemId))
       }),
     )
 

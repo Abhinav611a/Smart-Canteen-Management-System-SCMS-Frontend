@@ -1,6 +1,6 @@
-function toOptionalNumber(value) {
+function toPositiveId(value) {
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
 function toNumber(value, fallback = 0) {
@@ -34,26 +34,28 @@ function getFoodSource(item = {}) {
 
 function getFoodItemId(item = {}) {
   return (
-    toOptionalNumber(item?.foodItemId) ??
-    toOptionalNumber(item?.foodId) ??
-    toOptionalNumber(getFoodSource(item)?.id)
+    toPositiveId(item?.foodItemId) ??
+    toPositiveId(item?.foodId) ??
+    toPositiveId(getFoodSource(item)?.id)
   )
 }
 
 function getCartRowId(item = {}) {
   return (
-    toOptionalNumber(item?.cartItemId) ??
-    toOptionalNumber(item?.cartItem?.id) ??
-    toOptionalNumber(item?.id)
+    toPositiveId(item?.id) ??
+    toPositiveId(item?.cartItemId) ??
+    toPositiveId(item?.cartItem?.id)
   )
 }
 
 export function getCartItemIdentity(item = {}) {
+  const cartRowId = getCartRowId(item)
+  if (cartRowId !== null) return String(cartRowId)
+
   const foodItemId = getFoodItemId(item)
   if (foodItemId !== null) return String(foodItemId)
 
-  const cartRowId = getCartRowId(item)
-  return cartRowId !== null ? String(cartRowId) : ''
+  return ''
 }
 
 function buildPreviousItemMap(items = []) {
@@ -86,7 +88,7 @@ export function normaliseCartItem(item = {}, { previousItem = null } = {}) {
     ) ?? 'MAIN'
 
   return {
-    id: foodItemId ?? cartItemId,
+    id: cartItemId,
     cartItemId,
     foodItemId,
     name:
