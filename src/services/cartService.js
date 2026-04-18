@@ -483,22 +483,52 @@ export const cartService = {
   },
 
   async updateItem(item, quantity) {
-    const cartItemId = item.cartItemId ?? item.id
-    await api.put(ENDPOINTS.CART_ITEM(cartItemId), { quantity })
+    const foodItemId = Number(
+      item?.foodItemId ??
+        item?.foodItem?.id ??
+        item?.id,
+    )
+
+    if (!foodItemId || foodItemId <= 0) {
+      console.error('Invalid foodItemId for cart update:', item)
+      throw new Error('Invalid foodItemId for cart update')
+    }
+
+    await api.put(ENDPOINTS.CART_ITEM(foodItemId), { quantity })
     return this.getCart()
   },
 
   async removeItem(item) {
-    const cartItemId = item.cartItemId ?? item.id
-    await api.delete(ENDPOINTS.CART_ITEM(cartItemId))
+    const foodItemId = Number(
+      item?.foodItemId ??
+        item?.foodItem?.id ??
+        item?.id,
+    )
+
+    if (!foodItemId || foodItemId <= 0) {
+      console.error('Invalid foodItemId for cart remove:', item)
+      throw new Error('Invalid foodItemId for cart remove')
+    }
+
+    await api.delete(ENDPOINTS.CART_ITEM(foodItemId))
     return this.getCart()
   },
 
   async clearCart(items = [], { refetch = true } = {}) {
     const results = await Promise.allSettled(
       items.map((item) => {
-        const cartItemId = item.cartItemId ?? item.id
-        return api.delete(ENDPOINTS.CART_ITEM(cartItemId))
+        const foodItemId = Number(
+          item?.foodItemId ??
+            item?.foodItem?.id ??
+            item?.id,
+        )
+
+        if (!foodItemId || foodItemId <= 0) {
+          console.error('Invalid foodItemId for cart clear:', item)
+          throw new Error('Invalid foodItemId for cart clear')
+        }
+
+        return api.delete(ENDPOINTS.CART_ITEM(foodItemId))
       }),
     )
 
