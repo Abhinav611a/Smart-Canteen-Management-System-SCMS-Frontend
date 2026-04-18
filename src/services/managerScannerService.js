@@ -33,14 +33,19 @@ function buildScannerUrl(token, scannerUrl = '') {
     try {
       const baseOrigin =
         typeof window === 'undefined' ? 'http://localhost' : window.location.origin
-      return new URL(normalizedUrl, baseOrigin).toString()
+      const url = new URL(normalizedUrl, baseOrigin)
+
+      if (token && !url.searchParams.get('token')) {
+        url.searchParams.set('token', token)
+      }
+
+      return url.toString()
     } catch {
       return normalizedUrl
     }
   }
 
-  if (!token) return ''
-  if (typeof window === 'undefined') return ''
+  if (!token || typeof window === 'undefined') return ''
 
   const fallbackUrl = new URL('/manager/external-scanner', window.location.origin)
   fallbackUrl.searchParams.set('token', token)
@@ -55,6 +60,12 @@ function normaliseScannerSession(raw = {}) {
     scannerUrl: buildScannerUrl(token, raw?.scannerUrl ?? raw?.url),
     createdAt: raw?.createdAt ?? null,
     expiresAt: raw?.expiresAt ?? null,
+    valid:
+      typeof raw?.valid === 'boolean'
+        ? raw.valid
+        : token
+          ? true
+          : null,
   }
 }
 
@@ -166,40 +177,52 @@ export const managerScannerService = {
     }
   },
 
-  async validateSession(token) {
-    const normalizedToken = String(token || '').trim()
+async validateSession(token) {
+  const normalizedToken = String(token || '').trim()
 
-    if (!normalizedToken) {
+  if (!normalizedToken) {
+    throw tagExpiredScannerError(
+      new Error('Scanner session token is missing.'),
+      'Scanner session expired. Ask the manager to reconnect.',
+    )
+  }
+
+  try {
+    const response = await scannerApiClient.get(
+      ENDPOINTS.MANAGER_SCANNER_SESSION_VALIDATE,
+      {
+        headers: getScannerAuthHeaders(normalizedToken),
+      },
+    )
+
+    const data = unwrapResponseData(response)
+
+    if (data?.valid === false) {
       throw tagExpiredScannerError(
-        new Error('Scanner session token is missing.'),
-        'Scanner session token is missing.',
+        new Error('Scanner session expired. Ask the manager to reconnect.'),
+        'Scanner session expired. Ask the manager to reconnect.',
       )
     }
 
-    try {
-      const response = await scannerApiClient.get(
-        ENDPOINTS.MANAGER_SCANNER_SESSION_VALIDATE,
-        {
-          headers: getScannerAuthHeaders(normalizedToken),
-        },
+    return normaliseScannerSession({
+      ...data,
+      token: data?.token ?? normalizedToken,
+    })
+  } catch (error) {
+    if (
+      error?.response?.status === 401 ||
+      error?.response?.status === 403 ||
+      error?.response?.status === 404
+    ) {
+      throw tagExpiredScannerError(
+        error,
+        'Scanner session expired. Ask the manager to reconnect.',
       )
-
-      return normaliseScannerSession(unwrapResponseData(response))
-    } catch (error) {
-      if (
-        error?.response?.status === 401 ||
-        error?.response?.status === 403 ||
-        error?.response?.status === 404
-      ) {
-        throw tagExpiredScannerError(
-          error,
-          'Scanner session expired. Ask the manager to reconnect.',
-        )
-      }
-
-      throw error
     }
-  },
+
+    throw error
+  }
+},
 
   async verifyOrder(code, token) {
     const normalizedCode = extractQrCodeValue(code)
