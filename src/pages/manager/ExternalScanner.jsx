@@ -444,7 +444,7 @@ export default function ExternalScanner() {
         setBannerTitle('Starting camera')
         setBannerMessage('Allow camera access if your browser asks for permission.')
 
-        const scannerCameraConstraints = { facingMode: { ideal: 'environment' } }
+        const scannerCameraConstraints = { facingMode: 'environment' }
         const scannerStartConfig = {
           fps: 12,
           aspectRatio: 4 / 3,
