@@ -229,6 +229,7 @@ function StatusGlyph({ phase }) {
 export default function ExternalScanner() {
   const [searchParams] = useSearchParams()
   const token = String(searchParams.get('token') || '').trim()
+  console.log('[ExternalScanner] Component rendered')
   const scannerContainerRef = useRef(null)
   const scannerContainerIdRef = useRef(
     `external-manager-scanner-${Math.random().toString(36).slice(2, 10)}`,
@@ -418,6 +419,7 @@ export default function ExternalScanner() {
   )
 
   useEffect(() => {
+    console.log('[ExternalScanner] Init effect entered')
     if (!token) return undefined
 
     let cancelled = false
@@ -442,11 +444,36 @@ export default function ExternalScanner() {
         setBannerTitle('Starting camera')
         setBannerMessage('Allow camera access if your browser asks for permission.')
 
+        const scannerCameraConstraints = { facingMode: { ideal: 'environment' } }
+        const scannerStartConfig = {
+          fps: 12,
+          aspectRatio: 4 / 3,
+          disableFlip: false,
+        }
+
+        // Temporary debugging logs to diagnose external scanner startup issues.
+        console.log('[ExternalScanner] Starting scanner...', {
+          hasMediaDevices:
+            typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices),
+          hasGetUserMedia:
+            typeof navigator !== 'undefined' &&
+            typeof navigator.mediaDevices?.getUserMedia === 'function',
+          scannerContainerId: scannerContainerIdRef.current,
+          constraints: scannerCameraConstraints,
+          config: scannerStartConfig,
+        })
+
         const { Html5Qrcode, Html5QrcodeSupportedFormats } =
           await loadHtml5QrcodeLibrary()
         if (cancelled) return
 
         const container = scannerContainerRef.current
+        console.log('[ExternalScanner] Scanner prerequisites resolved', {
+          hasHtml5Qrcode: typeof Html5Qrcode === 'function',
+          hasSupportedFormats: Boolean(Html5QrcodeSupportedFormats),
+          hasContainer: Boolean(container),
+        })
+
         if (!container) {
           throw new Error('Scanner view is not ready yet.')
         }
@@ -465,12 +492,8 @@ export default function ExternalScanner() {
         html5QrcodeRef.current = scanner
 
         await scanner.start(
-          { facingMode: { ideal: 'environment' } },
-          {
-            fps: 12,
-            aspectRatio: 4 / 3,
-            disableFlip: false,
-          },
+          scannerCameraConstraints,
+          scannerStartConfig,
           (decodedText) => {
             void handleDetectedCode(decodedText)
           },
@@ -485,10 +508,25 @@ export default function ExternalScanner() {
         }
 
         html5QrcodeRunningRef.current = true
+        console.log('[ExternalScanner] Scanner started successfully', {
+          constraints: scannerCameraConstraints,
+          config: scannerStartConfig,
+        })
         setPhase('scanning')
         setReadyBanner()
       } catch (error) {
         if (cancelled) return
+
+        console.error('[ExternalScanner] Scanner failed to start:', error)
+        console.log('[ExternalScanner] Scanner startup diagnostics', {
+          hasMediaDevices:
+            typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices),
+          hasGetUserMedia:
+            typeof navigator !== 'undefined' &&
+            typeof navigator.mediaDevices?.getUserMedia === 'function',
+          scannerContainerId: scannerContainerIdRef.current,
+          hasContainer: Boolean(scannerContainerRef.current),
+        })
 
         if (isScannerSessionExpiredError(error)) {
           await expireSession(error)
