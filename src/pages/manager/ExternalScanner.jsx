@@ -330,27 +330,60 @@ export default function ExternalScanner() {
 
   const handleDetectedCode = useCallback(
     async (rawCode) => {
+      console.log('[ExternalScanner] handleDetectedCode entered', {
+        rawCode,
+        phase: phaseRef.current,
+        processing: processingRef.current,
+      })
+
       if (
         phaseRef.current === 'expired' ||
         phaseRef.current === 'error' ||
         processingRef.current
       ) {
+        console.log('[ExternalScanner] Scan ignored by guard', {
+          phase: phaseRef.current,
+          processing: processingRef.current,
+          reason:
+            phaseRef.current === 'expired'
+              ? 'expired'
+              : phaseRef.current === 'error'
+                ? 'error'
+                : 'processing',
+        })
         return
       }
 
       const normalizedCode = extractQrCodeValue(rawCode)
-      if (!normalizedCode) return
+      if (!normalizedCode) {
+        console.log('[ExternalScanner] Scan ignored because normalized code is empty', {
+          rawCode,
+        })
+        return
+      }
 
       const now = Date.now()
       const isDuplicateScan =
         lastScanValueRef.current === normalizedCode &&
         now - lastScanAtRef.current < SCAN_DEBOUNCE_MS
 
-      if (isDuplicateScan) return
+      if (isDuplicateScan) {
+        console.log('[ExternalScanner] Scan ignored as duplicate', {
+          normalizedCode,
+          previousCode: lastScanValueRef.current,
+          msSinceLastScan: now - lastScanAtRef.current,
+          debounceWindowMs: SCAN_DEBOUNCE_MS,
+        })
+        return
+      }
 
       lastScanValueRef.current = normalizedCode
       lastScanAtRef.current = now
       processingRef.current = true
+      console.log('[ExternalScanner] Scan accepted for processing', {
+        normalizedCode,
+        phase: phaseRef.current,
+      })
       clearFeedbackTimer()
       setPhase('processing')
       setBannerTone('info')
@@ -362,6 +395,9 @@ export default function ExternalScanner() {
         const invalidMessage =
           'Invalid QR code format. Scan the latest order QR and try again.'
 
+        console.log('[ExternalScanner] Scan rejected by QR format validation', {
+          normalizedCode,
+        })
         setPhase('scanning')
         setBannerTone('error')
         setBannerTitle('Scan failed')
@@ -376,7 +412,14 @@ export default function ExternalScanner() {
       }
 
       try {
+        console.log('[ExternalScanner] Verifying scanned code with backend', {
+          normalizedCode,
+        })
         const result = await managerScannerService.verifyOrder(normalizedCode, token)
+        console.log('[ExternalScanner] Backend verification succeeded', {
+          normalizedCode,
+          result,
+        })
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate([60, 40, 60])
@@ -392,10 +435,18 @@ export default function ExternalScanner() {
         })
       } catch (error) {
         if (isScannerSessionExpiredError(error)) {
+          console.log('[ExternalScanner] Backend verification failed due to expired session', {
+            normalizedCode,
+            error,
+          })
           await expireSession(error)
           return
         }
 
+        console.log('[ExternalScanner] Backend verification failed', {
+          normalizedCode,
+          error,
+        })
         const errorMessage = getVerifyErrorMessage(error)
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -495,10 +546,23 @@ export default function ExternalScanner() {
           scannerCameraConstraints,
           scannerStartConfig,
           (decodedText) => {
+            console.log('[ExternalScanner] Decode callback fired', {
+              decodedText,
+            })
+            console.log('[ExternalScanner] Invoking handleDetectedCode', {
+              decodedText,
+            })
             void handleDetectedCode(decodedText)
           },
-          () => {
-            // Ignore frame-level decode misses and keep scanning.
+          (decodeError) => {
+            if (
+              typeof decodeError === 'string' &&
+              decodeError.toLowerCase().includes('not found')
+            ) {
+              return
+            }
+
+            console.debug('[ExternalScanner] Decode callback miss/error', decodeError)
           },
         )
 
