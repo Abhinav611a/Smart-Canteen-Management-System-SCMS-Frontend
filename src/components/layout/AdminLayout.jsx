@@ -11,6 +11,7 @@ export default function AdminLayout() {
     { to: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
     { to: '/admin/analytics', icon: '📈', label: 'Analytics' },
     { to: '/admin/orders', icon: '📦', label: 'All Orders' },
+    { to: '/admin/pos', icon: '🧾', label: 'POS' },
     { to: '/admin/menu', icon: '🍴', label: 'Manage Menu' },
     { to: '/admin/users', icon: '👥', label: 'Users' },
   ]

@@ -41,6 +41,7 @@ const AdminOrders = lazy(() => import('@/pages/admin/AdminOrders'))
 const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'))
 const AdminMenu = lazy(() => import('@/pages/admin/AdminMenu'))
 const AdminAnalytics = lazy(() => import('@/pages/admin/AdminAnalytics'))
+const PosScreen = lazy(() => import('@/pages/admin/PosScreen'))
 
 const NotFound = lazy(() => import('@/pages/NotFound'))
 
@@ -185,6 +186,7 @@ export default function AppRoutes() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="orders" element={<AdminOrders />} />
+            <Route path="pos" element={<PosScreen />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="menu" element={<AdminMenu />} />
             <Route path="analytics" element={<AdminAnalytics />} />
