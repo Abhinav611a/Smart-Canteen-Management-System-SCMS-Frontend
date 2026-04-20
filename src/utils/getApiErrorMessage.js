@@ -1,14 +1,18 @@
-export function getApiErrorMessage(
-  error,
-  fallback = 'Something went wrong. Please try again.',
-) {
-  const message =
-    error?.response?.data?.message ||
-    error?.response?.data?.error ||
-    error?.message ||
-    fallback
+import axios from 'axios'
 
-  return String(message || '').trim() || fallback
+export function getApiErrorMessage(error) {
+  if (axios.isAxiosError(error)) {
+    return (
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      'Something went wrong'
+    )
+  }
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return 'Something went wrong'
 }
-
-export default getApiErrorMessage
