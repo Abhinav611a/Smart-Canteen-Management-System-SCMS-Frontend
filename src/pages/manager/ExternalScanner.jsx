@@ -110,6 +110,14 @@ function getVerifyErrorMessage(error) {
   return String(message || '').trim() || 'Unable to verify this QR code right now.'
 }
 
+function isKnownInvalidQrError(error) {
+  return error?.response?.status === 410
+}
+
+function getKnownInvalidQrMessage() {
+  return 'QR already used or expired.'
+}
+
 function getSessionExpiredMessage(error) {
   const message =
     error?.response?.data?.message ||
@@ -187,7 +195,7 @@ function StatusGlyph({ phase }) {
     )
   }
 
-  if (phase === 'expired' || phase === 'error') {
+  if (phase === 'expired' || phase === 'error' || phase === 'paused') {
     return (
       <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20 text-red-200">
         <svg
@@ -236,10 +244,12 @@ export default function ExternalScanner() {
   )
   const html5QrcodeRef = useRef(null)
   const html5QrcodeRunningRef = useRef(false)
+  const scannerPausedRef = useRef(false)
   const processingRef = useRef(false)
   const phaseRef = useRef(token ? 'validating' : 'expired')
   const lastScanValueRef = useRef('')
   const lastScanAtRef = useRef(0)
+  const failedCodeLockRef = useRef('')
   const feedbackTimerRef = useRef(0)
   const validatingRef = useRef(false)
 
@@ -271,14 +281,16 @@ export default function ExternalScanner() {
   const stopScanner = useCallback(async () => {
     const activeScanner = html5QrcodeRef.current
     const wasRunning = html5QrcodeRunningRef.current
+    const wasPaused = scannerPausedRef.current
 
     html5QrcodeRef.current = null
     html5QrcodeRunningRef.current = false
+    scannerPausedRef.current = false
 
     if (!activeScanner) return
 
     try {
-      if (wasRunning && typeof activeScanner.stop === 'function') {
+      if ((wasRunning || wasPaused) && typeof activeScanner.stop === 'function') {
         await activeScanner.stop()
       }
     } catch (error) {
@@ -294,6 +306,41 @@ export default function ExternalScanner() {
     }
   }, [])
 
+  const pauseScanner = useCallback(async () => {
+    const activeScanner = html5QrcodeRef.current
+
+    if (
+      !activeScanner ||
+      scannerPausedRef.current ||
+      typeof activeScanner.pause !== 'function'
+    ) {
+      return
+    }
+
+    try {
+      await Promise.resolve(activeScanner.pause(false))
+      scannerPausedRef.current = true
+    } catch (error) {
+      console.warn('[external-scanner] Failed to pause scanner:', error)
+    }
+  }, [])
+
+  const resumeScanner = useCallback(async () => {
+    const activeScanner = html5QrcodeRef.current
+
+    if (
+      !activeScanner ||
+      !scannerPausedRef.current ||
+      typeof activeScanner.resume !== 'function'
+    ) {
+      scannerPausedRef.current = false
+      return
+    }
+
+    await Promise.resolve(activeScanner.resume())
+    scannerPausedRef.current = false
+  }, [])
+
   const setReadyBanner = useCallback(() => {
     setBannerTone('info')
     setBannerTitle('Scanner ready')
@@ -306,6 +353,8 @@ export default function ExternalScanner() {
       clearFeedbackTimer()
       processingRef.current = false
       validatingRef.current = false
+      failedCodeLockRef.current = ''
+      phaseRef.current = 'expired'
       await stopScanner()
       setPhase('expired')
       setBannerTone('error')
@@ -322,11 +371,38 @@ export default function ExternalScanner() {
   const scheduleReadyBanner = useCallback(() => {
     clearFeedbackTimer()
     feedbackTimerRef.current = window.setTimeout(() => {
-      if (!processingRef.current && html5QrcodeRunningRef.current) {
+      if (
+        !processingRef.current &&
+        html5QrcodeRunningRef.current &&
+        !scannerPausedRef.current
+      ) {
         setReadyBanner()
       }
     }, FEEDBACK_HOLD_MS)
   }, [clearFeedbackTimer, setReadyBanner])
+
+  const handleRetryScan = useCallback(async () => {
+    clearFeedbackTimer()
+    processingRef.current = false
+    failedCodeLockRef.current = ''
+    lastScanValueRef.current = ''
+    lastScanAtRef.current = 0
+
+    try {
+      await resumeScanner()
+      phaseRef.current = 'scanning'
+      setPhase('scanning')
+      setReadyBanner()
+    } catch (error) {
+      console.warn('[external-scanner] Failed to resume scanner:', error)
+      phaseRef.current = 'error'
+      setPhase('error')
+      setBannerTone('error')
+      setBannerTitle('Unable to resume scanner')
+      setBannerMessage(getCameraErrorMessage(error))
+      setLastResultLabel('')
+    }
+  }, [clearFeedbackTimer, resumeScanner, setReadyBanner])
 
   const handleDetectedCode = useCallback(
     async (rawCode) => {
@@ -339,6 +415,7 @@ export default function ExternalScanner() {
       if (
         phaseRef.current === 'expired' ||
         phaseRef.current === 'error' ||
+        phaseRef.current === 'paused' ||
         processingRef.current
       ) {
         console.log('[ExternalScanner] Scan ignored by guard', {
@@ -349,6 +426,8 @@ export default function ExternalScanner() {
               ? 'expired'
               : phaseRef.current === 'error'
                 ? 'error'
+                : phaseRef.current === 'paused'
+                  ? 'paused'
                 : 'processing',
         })
         return
@@ -359,6 +438,16 @@ export default function ExternalScanner() {
         console.log('[ExternalScanner] Scan ignored because normalized code is empty', {
           rawCode,
         })
+        return
+      }
+
+      if (failedCodeLockRef.current === normalizedCode) {
+        console.log(
+          '[ExternalScanner] Scan ignored because code is locked after failed verification',
+          {
+            normalizedCode,
+          },
+        )
         return
       }
 
@@ -411,6 +500,8 @@ export default function ExternalScanner() {
         return
       }
 
+      let pausedAfterFailure = false
+
       try {
         console.log('[ExternalScanner] Verifying scanned code with backend', {
           normalizedCode,
@@ -420,6 +511,7 @@ export default function ExternalScanner() {
           normalizedCode,
           result,
         })
+        failedCodeLockRef.current = ''
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate([60, 40, 60])
@@ -447,10 +539,29 @@ export default function ExternalScanner() {
           normalizedCode,
           error,
         })
-        const errorMessage = getVerifyErrorMessage(error)
+        const knownInvalidQr = isKnownInvalidQrError(error)
+        const errorMessage = knownInvalidQr
+          ? getKnownInvalidQrMessage()
+          : getVerifyErrorMessage(error)
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate(120)
+        }
+
+        if (knownInvalidQr) {
+          pausedAfterFailure = true
+          failedCodeLockRef.current = normalizedCode
+          await pauseScanner()
+          phaseRef.current = 'paused'
+          setPhase('paused')
+          setBannerTone('error')
+          setBannerTitle('Scan paused')
+          setBannerMessage(
+            `${errorMessage} Retry to continue scanning in this session.`,
+          )
+          setLastResultLabel('')
+          toast.error(errorMessage, { id: 'external-scanner-invalid-state' })
+          return
         }
 
         setPhase('scanning')
@@ -460,13 +571,23 @@ export default function ExternalScanner() {
         setLastResultLabel('')
         toast.error(errorMessage, { id: 'external-scanner-error' })
       } finally {
-        window.setTimeout(() => {
+        if (pausedAfterFailure) {
           processingRef.current = false
-          scheduleReadyBanner()
-        }, FEEDBACK_HOLD_MS)
+        } else {
+          window.setTimeout(() => {
+            processingRef.current = false
+            scheduleReadyBanner()
+          }, FEEDBACK_HOLD_MS)
+        }
       }
     },
-    [clearFeedbackTimer, expireSession, scheduleReadyBanner, token],
+    [
+      clearFeedbackTimer,
+      expireSession,
+      pauseScanner,
+      scheduleReadyBanner,
+      token,
+    ],
   )
 
   useEffect(() => {
@@ -480,6 +601,9 @@ export default function ExternalScanner() {
         processingRef.current = false
         lastScanValueRef.current = ''
         lastScanAtRef.current = 0
+        failedCodeLockRef.current = ''
+        scannerPausedRef.current = false
+        phaseRef.current = 'validating'
         setPhase('validating')
         setBannerTone('info')
         setBannerTitle('Validating session')
@@ -576,6 +700,7 @@ export default function ExternalScanner() {
           constraints: scannerCameraConstraints,
           config: scannerStartConfig,
         })
+        phaseRef.current = 'scanning'
         setPhase('scanning')
         setReadyBanner()
       } catch (error) {
@@ -598,6 +723,7 @@ export default function ExternalScanner() {
         }
 
         await stopScanner()
+        phaseRef.current = 'error'
         setPhase('error')
         setBannerTone('error')
         setBannerTitle('Unable to start scanner')
@@ -613,6 +739,7 @@ export default function ExternalScanner() {
       clearFeedbackTimer()
       validatingRef.current = false
       processingRef.current = false
+      failedCodeLockRef.current = ''
       void stopScanner()
     }
   }, [
@@ -652,7 +779,8 @@ export default function ExternalScanner() {
     }
   }, [expireSession, phase, token])
 
-  const isPreviewVisible = phase === 'scanning' || phase === 'processing'
+  const isPreviewVisible =
+    phase === 'scanning' || phase === 'processing' || phase === 'paused'
   const bannerStyles =
     bannerTone === 'success'
       ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
@@ -684,6 +812,8 @@ export default function ExternalScanner() {
                 ? 'Session expired'
                 : phase === 'error'
                   ? 'Scanner unavailable'
+                  : phase === 'paused'
+                    ? 'Scan paused'
                   : 'Session active'}
             </div>
           </div>
@@ -739,6 +869,29 @@ export default function ExternalScanner() {
             </p>
           )}
         </div>
+
+        {phase === 'paused' && (
+          <div className="rounded-[1.5rem] border border-red-200 bg-red-50 px-5 py-4 text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">QR already used or expired</p>
+                <p className="mt-1 text-sm text-current/90">
+                  Scanning is paused for this session. Retry to scan a different QR.
+                </p>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  void handleRetryScan()
+                }}
+              >
+                Retry Scan
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap justify-end gap-3">
           {(phase === 'error' || phase === 'expired') && (
