@@ -333,6 +333,14 @@ export default function StudentOrders() {
     }
   }
 
+  const sortedOrders = [...orders].sort((a, b) => {
+    if (a?.createdAt && b?.createdAt) {
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    }
+
+    return Number(b?.id ?? 0) - Number(a?.id ?? 0)
+  })
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -412,7 +420,7 @@ export default function StudentOrders() {
       )}
 
       <div className="space-y-3">
-        {orders.map((order) => {
+        {sortedOrders.map((order) => {
           const isExpanded = expandedId === order.id
           const showInvoiceAction = canAccessInvoice(order)
           const isActive = [
