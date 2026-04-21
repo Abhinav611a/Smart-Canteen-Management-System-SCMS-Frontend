@@ -5,7 +5,7 @@ import { useOrders } from '@/hooks/useOrders'
 import { usePagination } from '@/hooks/usePagination'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import { formatCurrency, formatDateTime } from '@/utils/helpers'
+import { formatCurrency } from '@/utils/helpers'
 import {
   ENDPOINTS,
   ORDER_STATUS,
@@ -19,6 +19,8 @@ import Button from '@/components/ui/Button'
 
 const EXTRA_STATUS = 'PAYMENT_PENDING'
 const STATUSES = ['ALL', ...new Set([EXTRA_STATUS, ...Object.values(ORDER_STATUS)])]
+const UTC_TIMESTAMP_WITHOUT_ZONE =
+  /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/
 
 function isPaymentPending(order) {
   const directStatus = String(order?.status ?? '').toUpperCase()
@@ -51,6 +53,28 @@ function getOrderKey(order, index) {
   }
 
   return `fallback-row-${index}`
+}
+
+function formatAdminOrderDateTime(value) {
+  if (!value) return null
+
+  const raw = String(value).trim()
+  if (!raw) return null
+
+  const normalized = UTC_TIMESTAMP_WITHOUT_ZONE.test(raw)
+    ? `${raw.replace(' ', 'T')}Z`
+    : raw
+
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function AdminOrders() {
@@ -308,8 +332,9 @@ export default function AdminOrders() {
                     </td>
 
                     <td className="text-xs text-gray-400 whitespace-nowrap">
-                      {order?.formattedDate ||
-                        formatDateTime(order?.createdAt)}
+                      {formatAdminOrderDateTime(order?.createdAt) ||
+                        order?.formattedDate ||
+                        '—'}
                     </td>
                   </tr>
                 )
