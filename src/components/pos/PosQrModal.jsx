@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import QRCode from 'react-qr-code'
 import { X, Printer } from 'lucide-react'
 
