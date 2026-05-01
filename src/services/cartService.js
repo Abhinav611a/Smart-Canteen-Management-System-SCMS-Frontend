@@ -3,7 +3,6 @@ import { ENDPOINTS, LS_KEYS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
 import { normaliseCartItem, normaliseCartItems } from '@/utils/cart'
 
-const PAYMENT_METHODS = new Set(['CASH', 'UPI'])
 const CHECKOUT_INVALID_MESSAGE =
   'Some cart items could not be checked out. We refreshed your cart. Please review it and try again.'
 const CHECKOUT_EMPTY_AFTER_SANITIZE_MESSAGE =
@@ -167,21 +166,15 @@ export function isCartMismatchError(error) {
 
 function normalisePaymentMethod(paymentMethod = 'CASH') {
   const normalized = String(paymentMethod || 'CASH').trim().toUpperCase()
-  if (PAYMENT_METHODS.has(normalized)) {
-    return normalized
+
+  if (normalized === 'CASH') {
+    return 'CASH'
   }
 
-  if (normalized && normalized !== 'CASH') {
-    console.warn(
-      '[cartService] unsupported checkout payment method, falling back to CASH',
-      {
-        requestedPaymentMethod: normalized,
-        fallbackPaymentMethod: 'CASH',
-      },
-    )
-  }
-
-  return 'CASH'
+  const error = new Error('Online payments must use the Razorpay payment flow.')
+  error.code = 'ONLINE_PAYMENT_REQUIRES_RAZORPAY'
+  error.paymentMethod = normalized
+  throw error
 }
 
 function toOptionalNumber(value) {

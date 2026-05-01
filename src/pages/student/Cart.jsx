@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useNotifications } from '@/context/NotificationContext'
 import { useCanteen } from '@/context/CanteenContext'
@@ -10,6 +11,11 @@ import {
   cartSnapshotsMatch,
   isCartMismatchError,
 } from '@/services/cartService'
+import {
+  createPaymentOrder,
+  openRazorpayCheckout,
+  verifyPayment,
+} from '@/services/paymentService'
 import { formatCurrency } from '@/utils/helpers'
 
 const PAYMENT_METHODS = [
@@ -21,8 +27,30 @@ const PAYMENT_METHODS = [
 const SERVER_SYNC_MESSAGE =
   'Your cart was updated to match the latest server state. Please review and place your order again.'
 
+const ONLINE_PAYMENT_METHODS = new Set(['UPI', 'CARD'])
+
+function getErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    fallback
+  )
+}
+
+function buildOnlinePaymentPayload(cartItems = [], paymentMethod) {
+  return {
+    paymentMethod,
+    items: cartItems.map((item) => ({
+      foodItemId: Number(item.foodItemId ?? item.id),
+      quantity: Number(item.quantity ?? item.qty ?? 1),
+    })),
+  }
+}
+
 export default function StudentCart() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const {
     loading: canteenLoading,
     isOrderingAllowed,
@@ -49,8 +77,10 @@ export default function StudentCart() {
   const { addNotification } = useNotifications()
 
   const [placing, setPlacing] = useState(false)
+  const [checkoutStatus, setCheckoutStatus] = useState('')
   const [placed, setPlaced] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
+  const [lastFailedVerification, setLastFailedVerification] = useState(null)
 
   useEffect(() => {
     const syncOnMount = async () => {
@@ -118,6 +148,135 @@ export default function StudentCart() {
     }
   }
 
+  const completePlacedOrder = async (order, method) => {
+    const placedPaymentMethod = order?.paymentMethod ?? method
+    const placedOrder = {
+      ...order,
+      paymentMethod: placedPaymentMethod,
+    }
+
+    setPlaced(placedOrder)
+    setLastFailedVerification(null)
+    await syncCartAfterOrder()
+
+    addNotification({
+      type: 'order',
+      title: 'Order Placed! ðŸŽ‰',
+      message: `${
+        placedOrder.orderNumber || `#${placedOrder.id}` || 'Your order'
+      } is being prepared.`,
+      icon: 'ðŸ½',
+    })
+
+    toast.success(`Order placed with ${placedPaymentMethod}`)
+  }
+
+  const verifyOnlinePayment = async (verificationPayload, method) => {
+    setCheckoutStatus('Verifying payment...')
+
+    try {
+      const order = await verifyPayment(verificationPayload)
+      await completePlacedOrder(order, method)
+      return order
+    } catch (error) {
+      setLastFailedVerification({
+        payload: verificationPayload,
+        paymentMethod: method,
+      })
+      toast.error(
+        'Payment verification failed. Please check My Orders or retry verification.',
+      )
+      toast(
+        'If the payment was captured, the backend webhook may still recover the order.',
+        { icon: 'âš ï¸' },
+      )
+      error.code = 'PAYMENT_VERIFY_FAILED'
+      throw error
+    }
+  }
+
+  const handleRetryVerification = async () => {
+    if (!lastFailedVerification || placing) return
+
+    setPlacing(true)
+    setCheckoutStatus('Validating cart...')
+    try {
+      await verifyOnlinePayment(
+        lastFailedVerification.payload,
+        lastFailedVerification.paymentMethod,
+      )
+    } catch (error) {
+      console.error('Payment verification retry failed:', error)
+    } finally {
+      setCheckoutStatus('')
+      setPlacing(false)
+    }
+  }
+
+  const handleOnlineCheckout = async (backendCart) => {
+    const payload = buildOnlinePaymentPayload(backendCart?.items ?? [], paymentMethod)
+    const invalidItem = payload.items.find(
+      (item) =>
+        !Number.isFinite(item.foodItemId) ||
+        item.foodItemId <= 0 ||
+        !Number.isFinite(item.quantity) ||
+        item.quantity <= 0,
+    )
+
+    if (!payload.items.length || invalidItem) {
+      throw new Error('Some cart items could not be checked out. Please sync and try again.')
+    }
+
+    setCheckoutStatus('Creating payment...')
+    setLastFailedVerification(null)
+    const paymentData = await createPaymentOrder(payload)
+
+    setCheckoutStatus('Opening payment...')
+
+    await new Promise((resolve, reject) => {
+      let settled = false
+
+      const settle = (callback, value) => {
+        if (settled) return
+        settled = true
+        callback(value)
+      }
+
+      openRazorpayCheckout(paymentData, {
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.phone || user?.mobile || '',
+        },
+        onSuccess: async (response) => {
+          const verificationPayload = {
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature,
+          }
+
+          try {
+            await verifyOnlinePayment(verificationPayload, paymentMethod)
+            settle(resolve)
+          } catch (error) {
+            settle(reject, error)
+          }
+        },
+        onDismiss: () => {
+          const error = new Error('Payment cancelled')
+          error.code = 'PAYMENT_CANCELLED'
+          toast.error('Payment cancelled')
+          settle(reject, error)
+        },
+        onError: (error) => {
+          settle(reject, error)
+        },
+      }).catch((error) => {
+        settle(reject, error)
+      })
+    })
+  }
+
   const handlePlaceOrder = async () => {
     if (checkoutBlocked) {
       toast.error(
@@ -146,6 +305,7 @@ export default function StudentCart() {
     }
 
     setPlacing(true)
+    setCheckoutStatus('Validating cart...')
 
     try {
       const backendCart = await refreshCart({ apply: false, silent: true })
@@ -156,6 +316,11 @@ export default function StudentCart() {
       }
 
       replaceCartFromServer(backendCart)
+
+      if (ONLINE_PAYMENT_METHODS.has(paymentMethod)) {
+        await handleOnlineCheckout(backendCart)
+        return
+      }
 
       const order = await cartService.checkout({ paymentMethod })
       const placedPaymentMethod = order?.paymentMethod ?? paymentMethod
@@ -195,10 +360,7 @@ export default function StudentCart() {
       )
 
       const status = error?.response?.status
-      const backendMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        error?.message
+      const backendMessage = getErrorMessage(error, '')
 
       const message = String(backendMessage || '').toLowerCase()
 
@@ -214,12 +376,20 @@ export default function StudentCart() {
           latestCart: error?.latestCart,
           message: error?.message || SERVER_SYNC_MESSAGE,
         })
+      } else if (
+        error?.code === 'PAYMENT_CANCELLED' ||
+        error?.code === 'PAYMENT_VERIFY_FAILED'
+      ) {
+        // The payment callbacks already showed a specific message.
       } else if (status === 400) {
         toast.error(backendMessage || 'Checkout request is invalid.')
+      } else if (ONLINE_PAYMENT_METHODS.has(paymentMethod)) {
+        toast.error(backendMessage || 'Failed to process payment. Please try again.')
       } else {
         toast.error(backendMessage || 'Failed to place order. Please try again.')
       }
     } finally {
+      setCheckoutStatus('')
       setPlacing(false)
     }
   }
@@ -517,6 +687,25 @@ export default function StudentCart() {
           </div>
         </div>
 
+        {lastFailedVerification && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-500/20 dark:bg-amber-500/10">
+            <p className="font-semibold text-amber-900 dark:text-amber-200">
+              Payment verification needs attention
+            </p>
+            <p className="mt-1 text-amber-700 dark:text-amber-300">
+              Payment verification failed. Please check My Orders or retry verification.
+            </p>
+            <button
+              type="button"
+              onClick={handleRetryVerification}
+              disabled={cartBusy}
+              className="mt-3 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {placing ? 'Verifying payment...' : 'Retry Verification'}
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={handlePlaceOrder}
@@ -528,12 +717,14 @@ export default function StudentCart() {
             : !isOrderingAllowed
               ? checkoutActionLabel
               : placing
-                ? 'Validating Cart...'
+                ? checkoutStatus || 'Processing...'
                 : `Place Order (${paymentMethod})`}
         </button>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-500">
-          Checked out through your backend cart flow
+          {ONLINE_PAYMENT_METHODS.has(paymentMethod)
+            ? 'Online payments are verified by Razorpay before the order is created'
+            : 'Checked out through your backend cart flow'}
         </p>
       </div>
     </div>

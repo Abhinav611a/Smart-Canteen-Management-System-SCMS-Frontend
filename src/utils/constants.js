@@ -44,6 +44,9 @@ export const ENDPOINTS = {
   REORDER: (id) => `/orders/${id}/reorder`,
   INVOICE: (id) => `/orders/${id}/invoice`,
 
+  PAYMENTS_CREATE_ORDER: '/payments/create-order',
+  PAYMENTS_VERIFY: '/payments/verify',
+
   KITCHEN_ORDERS: '/kitchen/orders',
   KITCHEN_ORDER_STATUS: (id) => `/kitchen/orders/${id}/status`,
   KITCHEN_CANTEEN_READY: '/kitchen/canteen/kitchen-ready',
