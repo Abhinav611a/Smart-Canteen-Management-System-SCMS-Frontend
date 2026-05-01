@@ -1,6 +1,20 @@
 import api from './api'
 import { ENDPOINTS, MENU_CATEGORY_EMOJIS } from '@/utils/constants'
 
+function normalisePreparedItem(value) {
+  if (value === true || value === false) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'true') return true
+    if (normalized === 'false') return false
+  }
+
+  return null
+}
+
 function normaliseItem(item = {}) {
   const cat = item.foodCategory ?? item.category ?? 'MAIN'
   return {
@@ -10,6 +24,7 @@ function normaliseItem(item = {}) {
     foodCategory: cat,
     price: Number(item.price ?? 0),
     available: item.available ?? true,
+    isPreparedItem: normalisePreparedItem(item.isPreparedItem),
     emoji: MENU_CATEGORY_EMOJIS[cat] ?? '🍴',
     description: item.description ?? '',
     rating: Number(item.rating ?? 0),
@@ -19,7 +34,13 @@ function normaliseItem(item = {}) {
 }
 
 function normalisePage(page) {
-  const content = Array.isArray(page) ? page : (page?.content ?? [])
+  const payload =
+    page && typeof page === 'object' && 'success' in page ? page.data : page
+  const data =
+    payload && typeof payload === 'object' && 'data' in payload
+      ? payload.data
+      : payload
+  const content = Array.isArray(data) ? data : (data?.content ?? [])
   return content.map(normaliseItem)
 }
 
