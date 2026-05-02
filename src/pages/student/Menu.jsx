@@ -34,6 +34,7 @@ export default function StudentMenu() {
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
+  const [brokenImages, setBrokenImages] = useState({})
 
   const filtered = useMemo(() => {
     return menu.filter((item) => {
@@ -78,6 +79,8 @@ export default function StudentMenu() {
   const getCartEntry = (id) => cartEntriesByMenuItemId.get(Number(id)) ?? null
 
   const cartQty = (id) => getCartEntry(id)?.qty || 0
+
+  const hasUsableImage = (item) => Boolean(item.imageUrl && !brokenImages[item.id])
 
   const cartItemCount = useMemo(
     () => cartItems.reduce((sum, item) => sum + (item.qty || 0), 0),
@@ -255,6 +258,7 @@ export default function StudentMenu() {
             {filtered.map((item, i) => {
               const qty = cartQty(item.id)
               const canInteract = item.available && isOrderingAllowed && !cartSyncing
+              const showImage = hasUsableImage(item)
 
               return (
                 <motion.article
@@ -294,9 +298,18 @@ export default function StudentMenu() {
                       </div>
                     )}
 
-                    <div className="flex h-36 items-center justify-center text-6xl transition-transform duration-200 hover:scale-105">
-                      {item.emoji}
-                    </div>
+                    {showImage ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="h-36 w-full object-cover transition-transform duration-200 hover:scale-105"
+                        onError={() => setBrokenImages((current) => ({ ...current, [item.id]: true }))}
+                      />
+                    ) : (
+                      <div className="flex h-36 items-center justify-center text-6xl transition-transform duration-200 hover:scale-105">
+                        {item.emoji}
+                      </div>
+                    )}
 
                     {!item.available && (
                       <div className="absolute inset-0 flex items-center justify-center bg-slate-900/45">

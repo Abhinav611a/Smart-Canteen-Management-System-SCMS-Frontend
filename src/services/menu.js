@@ -19,6 +19,22 @@ function toPreparedItemPayload(value) {
   return value === false || value === 'false' ? false : true
 }
 
+function buildMenuPayload(data) {
+  const payload = {
+    name: data.name,
+    foodCategory: data.foodCategory ?? data.category,
+    price: Number(data.price),
+    imageUrl: data.imageUrl ?? null,
+    isPreparedItem: toPreparedItemPayload(data.isPreparedItem),
+  }
+
+  if (data.maxPerOrder !== undefined) {
+    payload.maxPerOrder = data.maxPerOrder
+  }
+
+  return payload
+}
+
 function normaliseItem(item = {}) {
   const cat = item.foodCategory ?? item.category ?? 'MAIN'
   return {
@@ -32,7 +48,8 @@ function normaliseItem(item = {}) {
     emoji: MENU_CATEGORY_EMOJIS[cat] ?? '🍴',
     description: item.description ?? '',
     rating: item.rating == null ? null : Number(item.rating),
-    imageUrl: item.imageUrl ?? null,
+    imageUrl: item.imageUrl ?? item.image_url ?? item.image ?? null,
+    maxPerOrder: item.maxPerOrder ?? null,
     ordersToday: Number(item.ordersToday ?? item.totalSoldToday ?? 0),
   }
 }
@@ -65,23 +82,13 @@ export const menuService = {
   },
 
   async create(data) {
-    const payload = {
-      name: data.name,
-      foodCategory: data.foodCategory ?? data.category,
-      price: Number(data.price),
-      isPreparedItem: toPreparedItemPayload(data.isPreparedItem),
-    }
+    const payload = buildMenuPayload(data)
     const result = await api.post(ENDPOINTS.MENU, payload)
     return normaliseItem(result)
   },
 
   async update(id, data) {
-    const payload = {
-      name: data.name,
-      foodCategory: data.foodCategory ?? data.category,
-      price: Number(data.price),
-      isPreparedItem: toPreparedItemPayload(data.isPreparedItem),
-    }
+    const payload = buildMenuPayload(data)
     const result = await api.put(ENDPOINTS.MENU_ITEM(id), payload)
     return normaliseItem(result)
   },
