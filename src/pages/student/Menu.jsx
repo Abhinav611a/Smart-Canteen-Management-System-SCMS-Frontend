@@ -329,10 +329,14 @@ export default function StudentMenu() {
                     </p>
 
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="inline-flex items-center gap-1 font-semibold text-amber-500">
-                        <Star size={12} fill="currentColor" />
-                        {item.rating ?? 0}
-                      </span>
+                      {item.rating == null ? (
+                        <span className="font-medium text-slate-400">No ratings yet</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-semibold text-amber-500">
+                          <Star size={12} fill="currentColor" />
+                          {item.rating}
+                        </span>
+                      )}
                       <span className="text-slate-400">
                         {item.ordersToday ?? 0} ordered today
                       </span>

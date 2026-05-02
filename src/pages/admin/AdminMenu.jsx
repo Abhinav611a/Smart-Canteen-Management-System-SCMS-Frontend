@@ -201,7 +201,13 @@ export default function AdminMenu() {
                         {item.ordersToday > 30 && <span className="text-xs text-amber-500">🔥</span>}
                       </div>
                     </td>
-                    <td><span className="text-amber-500 font-semibold">⭐ {item.rating}</span></td>
+                    <td>
+                      {item.rating == null ? (
+                        <span className="text-xs font-medium text-gray-400 dark:text-gray-500">No ratings yet</span>
+                      ) : (
+                        <span className="text-amber-500 font-semibold">⭐ {item.rating}</span>
+                      )}
+                    </td>
                     <td>
                       <span className={item.available ? 'badge badge-green' : 'badge badge-red'}>
                         {item.available ? '✅ On' : '❌ Off'}

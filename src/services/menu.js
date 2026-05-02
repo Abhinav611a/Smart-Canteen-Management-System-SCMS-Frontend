@@ -31,7 +31,7 @@ function normaliseItem(item = {}) {
     isPreparedItem: normalisePreparedItem(item.isPreparedItem),
     emoji: MENU_CATEGORY_EMOJIS[cat] ?? '🍴',
     description: item.description ?? '',
-    rating: Number(item.rating ?? 0),
+    rating: item.rating == null ? null : Number(item.rating),
     imageUrl: item.imageUrl ?? null,
     ordersToday: Number(item.ordersToday ?? item.totalSoldToday ?? 0),
   }
