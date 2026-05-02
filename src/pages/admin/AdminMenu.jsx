@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useMenu } from '@/hooks/useMenu'
@@ -19,6 +19,50 @@ const DEFAULT_FORM = {
   emoji: 'ðŸ›',
   description: '',
   isPreparedItem: true,
+  imageUrl: null,
+  maxPerOrder: null,
+}
+
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+
+function validateImageFile(file) {
+  if (!file) return null
+  if (!file.type?.startsWith('image/')) {
+    return 'Choose a valid image file'
+  }
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return 'Image must be 5 MB or smaller'
+  }
+  return null
+}
+
+async function uploadMenuImage(file) {
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error('Cloudinary upload is not configured')
+  }
+
+  const body = new FormData()
+  body.append('file', file)
+  body.append('upload_preset', uploadPreset)
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body,
+  })
+
+  if (!response.ok) {
+    throw new Error('Image upload failed')
+  }
+
+  const data = await response.json()
+  if (!data.secure_url) {
+    throw new Error('Cloudinary did not return an image URL')
+  }
+
+  return data.secure_url
 }
 
 function getFoodTypeMeta(isPreparedItem) {
@@ -40,8 +84,18 @@ export default function AdminMenu() {
   const [showModal,  setShowModal]  = useState(false)
   const [editing,    setEditing]    = useState(null)
   const [form,       setForm]       = useState(DEFAULT_FORM)
+  const [imageFile,  setImageFile]  = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
   const [formErrors, setFormErrors] = useState({})
   const [saving,     setSaving]     = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
 
   const filtered = menu.filter(item => {
     const matchCat  = catFilter === 'All' || item.category === catFilter
@@ -49,9 +103,15 @@ export default function AdminMenu() {
     return matchCat && matchSearch
   })
 
+  const resetImageSelection = (nextPreviewUrl = null) => {
+    setImageFile(null)
+    setPreviewUrl(nextPreviewUrl)
+  }
+
   const openAdd = () => {
     setEditing(null)
     setForm(DEFAULT_FORM)
+    resetImageSelection(null)
     setFormErrors({})
     setShowModal(true)
   }
@@ -66,9 +126,39 @@ export default function AdminMenu() {
       emoji: item.emoji || MENU_CATEGORY_EMOJIS[item.category] || '🍴',
       description: item.description || '',
       isPreparedItem: item.isPreparedItem ?? true,
+      imageUrl: item.imageUrl ?? null,
+      maxPerOrder: item.maxPerOrder ?? null,
     })
+    resetImageSelection(item.imageUrl ?? null)
     setFormErrors({})
     setShowModal(true)
+  }
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] ?? null
+    const imageError = validateImageFile(file)
+
+    if (imageError) {
+      setImageFile(null)
+      setPreviewUrl(form.imageUrl ?? null)
+      setFormErrors(p => ({ ...p, image: imageError }))
+      event.target.value = ''
+      return
+    }
+
+    setFormErrors(p => {
+      const next = { ...p }
+      delete next.image
+      return next
+    })
+
+    if (!file) {
+      resetImageSelection(form.imageUrl ?? null)
+      return
+    }
+
+    setImageFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
   }
 
   const handleSave = async () => {
@@ -76,7 +166,13 @@ export default function AdminMenu() {
     if (hasErrors(errors)) { setFormErrors(errors); return }
     setSaving(true)
     try {
-      const payload = { ...form, price: parseFloat(form.price), isPreparedItem: form.isPreparedItem === true }
+      const imageUrl = imageFile ? await uploadMenuImage(imageFile) : form.imageUrl
+      const payload = {
+        ...form,
+        price: parseFloat(form.price),
+        isPreparedItem: form.isPreparedItem === true,
+        imageUrl: imageUrl ?? null,
+      }
       if (editing) {
         await updateItem(editing.id, payload)
         toast.success(`${form.name} updated!`)
@@ -181,7 +277,15 @@ export default function AdminMenu() {
                   <motion.tr key={item.id} layout>
                     <td>
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{item.emoji}</span>
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                          />
+                        ) : (
+                          <span className="text-2xl">{item.emoji}</span>
+                        )}
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">{item.name}</p>
                           <p className="text-xs text-gray-400 max-w-[180px] truncate">{item.description}</p>
@@ -285,6 +389,30 @@ export default function AdminMenu() {
             onChange={e => setForm(p => ({ ...p, emoji: e.target.value }))}
             placeholder="🍄"
           />
+          <div className="col-span-2">
+            <label className="input-label">Item Image</label>
+            <input
+              className="input-field"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+            />
+            {formErrors.image && (
+              <p className="mt-1 text-xs font-medium text-red-500">{formErrors.image}</p>
+            )}
+            {previewUrl && (
+              <div className="mt-3 flex items-center gap-3">
+                <img
+                  src={previewUrl}
+                  alt={`${form.name || 'Menu item'} preview`}
+                  className="h-20 w-20 rounded-lg object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {imageFile ? 'Selected image preview' : 'Current menu image'}
+                </p>
+              </div>
+            )}
+          </div>
           <div>
             <label className="input-label">Category</label>
             <select
