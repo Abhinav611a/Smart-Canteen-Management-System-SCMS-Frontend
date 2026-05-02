@@ -11,13 +11,35 @@ import Input from '@/components/ui/Input'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 
+const DEFAULT_FORM = {
+  name: '',
+  category: 'MAIN',
+  foodCategory: 'MAIN',
+  price: '',
+  emoji: 'ðŸ›',
+  description: '',
+  isPreparedItem: true,
+}
+
+function getFoodTypeMeta(isPreparedItem) {
+  if (isPreparedItem === true) {
+    return { label: 'Cooked', className: 'badge-yellow' }
+  }
+
+  if (isPreparedItem === false) {
+    return { label: 'Readymade', className: 'badge-blue' }
+  }
+
+  return { label: 'Unknown', className: 'badge-gray' }
+}
+
 export default function AdminMenu() {
   const { menu, loading, toggleItem, addItem, removeItem, updateItem } = useMenu()
   const [search,     setSearch]     = useState('')
   const [catFilter,  setCatFilter]  = useState('All')
   const [showModal,  setShowModal]  = useState(false)
   const [editing,    setEditing]    = useState(null)
-  const [form,       setForm]       = useState({ name: '', category: 'MAIN', foodCategory: 'MAIN', price: '', emoji: '🍛', description: '' })
+  const [form,       setForm]       = useState(DEFAULT_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [saving,     setSaving]     = useState(false)
 
@@ -29,14 +51,22 @@ export default function AdminMenu() {
 
   const openAdd = () => {
     setEditing(null)
-    setForm({ name: '', category: 'MAIN', foodCategory: 'MAIN', price: '', emoji: '🍛', description: '' })
+    setForm(DEFAULT_FORM)
     setFormErrors({})
     setShowModal(true)
   }
 
   const openEdit = (item) => {
     setEditing(item)
-    setForm({ name: item.name, category: item.category, foodCategory: item.category, price: String(item.price), emoji: item.emoji || MENU_CATEGORY_EMOJIS[item.category] || '🍴', description: item.description || '' })
+    setForm({
+      name: item.name,
+      category: item.category,
+      foodCategory: item.category,
+      price: String(item.price),
+      emoji: item.emoji || MENU_CATEGORY_EMOJIS[item.category] || '🍴',
+      description: item.description || '',
+      isPreparedItem: item.isPreparedItem ?? true,
+    })
     setFormErrors({})
     setShowModal(true)
   }
@@ -46,7 +76,7 @@ export default function AdminMenu() {
     if (hasErrors(errors)) { setFormErrors(errors); return }
     setSaving(true)
     try {
-      const payload = { ...form, price: parseFloat(form.price) }
+      const payload = { ...form, price: parseFloat(form.price), isPreparedItem: form.isPreparedItem === true }
       if (editing) {
         await updateItem(editing.id, payload)
         toast.success(`${form.name} updated!`)
@@ -143,7 +173,7 @@ export default function AdminMenu() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Item</th><th>Category</th><th>Price</th><th>Orders Today</th><th>Rating</th><th>Status</th><th>Actions</th>
+                  <th>Item</th><th>Category</th><th>Food Type</th><th>Price</th><th>Orders Today</th><th>Rating</th><th>Status</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +189,11 @@ export default function AdminMenu() {
                       </div>
                     </td>
                     <td><span className="badge badge-gray text-[10px]">{MENU_CATEGORY_EMOJIS[item.category]} {MENU_CATEGORY_LABELS[item.category] ?? item.category}</span></td>
+                    <td>
+                      <span className={`badge ${getFoodTypeMeta(item.isPreparedItem).className} text-[10px]`}>
+                        {getFoodTypeMeta(item.isPreparedItem).label}
+                      </span>
+                    </td>
                     <td className="font-bold text-gray-900 dark:text-white">{formatCurrency(item.price)}</td>
                     <td>
                       <div className="flex items-center gap-2">
@@ -254,6 +289,17 @@ export default function AdminMenu() {
               {MENU_CATEGORIES.filter(c => c !== 'All').map(c => (
                 <option key={c} value={c}>{MENU_CATEGORY_EMOJIS[c]} {MENU_CATEGORY_LABELS[c]}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="input-label">Food Type</label>
+            <select
+              className="input-field"
+              value={String(form.isPreparedItem ?? true)}
+              onChange={e => setForm(p => ({ ...p, isPreparedItem: e.target.value === 'true' }))}
+            >
+              <option value="true">Cooked</option>
+              <option value="false">Readymade</option>
             </select>
           </div>
           <Input

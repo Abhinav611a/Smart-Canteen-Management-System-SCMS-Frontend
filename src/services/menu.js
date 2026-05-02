@@ -15,6 +15,10 @@ function normalisePreparedItem(value) {
   return null
 }
 
+function toPreparedItemPayload(value) {
+  return value === false || value === 'false' ? false : true
+}
+
 function normaliseItem(item = {}) {
   const cat = item.foodCategory ?? item.category ?? 'MAIN'
   return {
@@ -65,6 +69,7 @@ export const menuService = {
       name: data.name,
       foodCategory: data.foodCategory ?? data.category,
       price: Number(data.price),
+      isPreparedItem: toPreparedItemPayload(data.isPreparedItem),
     }
     const result = await api.post(ENDPOINTS.MENU, payload)
     return normaliseItem(result)
@@ -75,6 +80,7 @@ export const menuService = {
       name: data.name,
       foodCategory: data.foodCategory ?? data.category,
       price: Number(data.price),
+      isPreparedItem: toPreparedItemPayload(data.isPreparedItem),
     }
     const result = await api.put(ENDPOINTS.MENU_ITEM(id), payload)
     return normaliseItem(result)
