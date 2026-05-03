@@ -19,9 +19,11 @@ import { ORDER_STATUS } from '@/utils/constants'
 
 function normalizeRealtimeOrder(order = {}) {
   const items = Array.isArray(order.items) ? order.items : []
+  const status = String(order.status || '').toUpperCase()
 
   return {
     ...order,
+    status,
     studentName: order.studentName || order.user?.name || 'Customer',
     studentEmail: order.studentEmail || order.user?.email || '',
     total:
@@ -41,31 +43,25 @@ function normalizeRealtimeOrder(order = {}) {
             return sum + qty
           }, 0),
     orderNumber: order.orderNumber || `#${order.id}`,
-    statusLabel: order.statusLabel || order.status || 'UNKNOWN',
+    statusLabel: order.statusLabel || status || 'UNKNOWN',
   }
 }
 
 function matchesScope(order, scope) {
   const status = String(order?.status || '').toUpperCase()
+  const activeKitchenStatuses = [
+    ORDER_STATUS.PENDING,
+    ORDER_STATUS.PREPARING,
+    'PROCESSING',
+  ]
 
   switch (scope) {
     case 'ready':
       return status === ORDER_STATUS.READY
 
     case 'monitor':
-      return [
-        ORDER_STATUS.PAYMENT_PENDING,
-        ORDER_STATUS.PENDING,
-        ORDER_STATUS.PREPARING,
-        ORDER_STATUS.READY,
-      ].includes(status)
-
     case 'kitchen':
-      return [
-        ORDER_STATUS.PENDING,
-        ORDER_STATUS.PREPARING,
-        ORDER_STATUS.READY,
-      ].includes(status)
+      return activeKitchenStatuses.includes(status)
 
     case 'my':
     case 'all':
@@ -106,7 +102,11 @@ export function useOrders(scope = 'all') {
           data = []
       }
 
-      setOrders(Array.isArray(data) ? data : [])
+      setOrders(
+        Array.isArray(data)
+          ? data.filter((order) => matchesScope(order, scope))
+          : []
+      )
     } catch (err) {
       setError(err?.message || 'Failed to load orders')
       setOrders([])

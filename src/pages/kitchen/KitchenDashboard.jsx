@@ -37,6 +37,16 @@ const TAB_CONFIG = [
   },
 ]
 
+const ACTIVE_KITCHEN_STATUSES = [
+  ORDER_STATUS.PENDING,
+  ORDER_STATUS.PREPARING,
+  'PROCESSING',
+]
+
+function normalizeStatus(status) {
+  return String(status || '').toUpperCase()
+}
+
 function ElapsedBadge({ seconds, timeStatus }) {
   if (!seconds && seconds !== 0) return null
 
@@ -107,34 +117,36 @@ export default function KitchenDashboard() {
   const { addNotification } = useNotifications()
   const [completingId, setCompletingId] = useState(null)
 
-  const visibleOrders = orders.filter((o) =>
-    [ORDER_STATUS.PENDING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].includes(
-      o.status
-    )
-  )
+  const visibleOrders = orders.filter((o) => {
+    const status = normalizeStatus(o.status)
+
+    if (currentScope === 'ready') {
+      return status === ORDER_STATUS.READY
+    }
+
+    return ACTIVE_KITCHEN_STATUSES.includes(status)
+  })
 
   const { isConnected } = useWebSocket(
     'kitchen:orders',
     useCallback(
       (order) => {
-        const activeStatuses = [
-          ORDER_STATUS.PENDING,
-          ORDER_STATUS.PREPARING,
-          ORDER_STATUS.READY,
-        ]
+        const status = normalizeStatus(order.status)
 
-        if (currentScope === 'ready' && order.status !== ORDER_STATUS.READY) {
+        if (currentScope === 'ready' && status !== ORDER_STATUS.READY) {
+          applyRealtimeUpdate({ ...order, status })
           return
         }
 
         if (
           currentScope === 'monitor' &&
-          !activeStatuses.includes(order.status)
+          !ACTIVE_KITCHEN_STATUSES.includes(status)
         ) {
+          applyRealtimeUpdate({ ...order, status })
           return
         }
 
-        applyRealtimeUpdate(order)
+        applyRealtimeUpdate({ ...order, status })
       },
       [applyRealtimeUpdate, currentScope]
     )
@@ -171,13 +183,14 @@ export default function KitchenDashboard() {
   }
 
   const pendingCount = visibleOrders.filter(
-    (o) => o.status === ORDER_STATUS.PENDING
+    (o) => normalizeStatus(o.status) === ORDER_STATUS.PENDING
   ).length
   const preparingCount = visibleOrders.filter(
-    (o) => o.status === ORDER_STATUS.PREPARING
+    (o) =>
+      [ORDER_STATUS.PREPARING, 'PROCESSING'].includes(normalizeStatus(o.status))
   ).length
   const readyCount = visibleOrders.filter(
-    (o) => o.status === ORDER_STATUS.READY
+    (o) => normalizeStatus(o.status) === ORDER_STATUS.READY
   ).length
 
   return (
@@ -303,12 +316,13 @@ export default function KitchenDashboard() {
 
                       <span
                         className={`badge ${
-                          ORDER_STATUS_COLORS[order.status] ?? 'badge-gray'
+                          ORDER_STATUS_COLORS[normalizeStatus(order.status)] ??
+                          'badge-gray'
                         }`}
                       >
-                        {ORDER_STATUS_ICONS[order.status]}{' '}
+                        {ORDER_STATUS_ICONS[normalizeStatus(order.status)]}{' '}
                         {order.statusLabel ||
-                          ORDER_STATUS_LABELS[order.status] ||
+                          ORDER_STATUS_LABELS[normalizeStatus(order.status)] ||
                           order.status}
                       </span>
                     </div>
@@ -354,7 +368,7 @@ export default function KitchenDashboard() {
                 )}
 
                 {activeTab === 'ready' &&
-                  order.status === ORDER_STATUS.READY && (
+                  normalizeStatus(order.status) === ORDER_STATUS.READY && (
                     <Button
                       className="w-full"
                       onClick={() => handleComplete(order)}

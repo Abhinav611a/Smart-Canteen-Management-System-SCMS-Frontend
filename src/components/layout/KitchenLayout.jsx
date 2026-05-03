@@ -68,6 +68,16 @@ const themeMap = {
   },
 }
 
+const ACTIVE_KITCHEN_STATUSES = ['PENDING', 'PREPARING', 'PROCESSING']
+
+function normalizeStatus(status) {
+  return String(status || '').toUpperCase()
+}
+
+function isActiveKitchenOrder(order) {
+  return ACTIVE_KITCHEN_STATUSES.includes(normalizeStatus(order?.status))
+}
+
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -86,7 +96,7 @@ function formatElapsedTime(elapsedSeconds = 0) {
 function getDisplayStatus(status, statusLabel) {
   if (statusLabel) return String(statusLabel).toUpperCase()
 
-  switch (status) {
+  switch (normalizeStatus(status)) {
     case 'PENDING':
       return 'PENDING'
     case 'PREPARING':
@@ -105,20 +115,24 @@ function getDisplayStatus(status, statusLabel) {
 }
 
 function getPriorityFromBackend(status, timeStatus) {
+  const normalizedStatus = normalizeStatus(status)
   const ts = String(timeStatus || '').toUpperCase()
 
-  if (status === 'READY' || ts.includes('READY')) return 'ready'
-  if (status === 'PENDING') return 'pending'
+  if (normalizedStatus === 'READY' || ts.includes('READY')) return 'ready'
+  if (normalizedStatus === 'PENDING') return 'pending'
   if (ts.includes('CRITICAL') || ts.includes('DELAY')) return 'critical'
   if (ts.includes('WARNING')) return 'warning'
-  if (status === 'PREPARING') return 'warning'
+  if (normalizedStatus === 'PREPARING' || normalizedStatus === 'PROCESSING') {
+    return 'warning'
+  }
   return 'normal'
 }
 
 function getStatusStyle(priority, mode, orderStatus) {
   const isDark = mode === 'dark'
+  const normalizedStatus = normalizeStatus(orderStatus)
 
-  if (orderStatus === 'PENDING') {
+  if (normalizedStatus === 'PENDING') {
     return {
       border: isDark ? 'border-slate-700' : 'border-slate-300',
       strip: 'bg-slate-400',
@@ -127,7 +141,7 @@ function getStatusStyle(priority, mode, orderStatus) {
     }
   }
 
-  if (orderStatus === 'COMPLETED') {
+  if (normalizedStatus === 'COMPLETED') {
     return {
       border: isDark ? 'border-emerald-500/20' : 'border-emerald-500/20',
       strip: 'bg-emerald-500',
@@ -136,7 +150,7 @@ function getStatusStyle(priority, mode, orderStatus) {
     }
   }
 
-  if (orderStatus === 'CANCELLED') {
+  if (normalizedStatus === 'CANCELLED') {
     return {
       border: isDark ? 'border-slate-700' : 'border-slate-300',
       strip: 'bg-slate-400',
@@ -145,7 +159,7 @@ function getStatusStyle(priority, mode, orderStatus) {
     }
   }
 
-  if (orderStatus === 'READY') {
+  if (normalizedStatus === 'READY') {
     return {
       border: isDark ? 'border-emerald-500/30' : 'border-emerald-500/20',
       strip: 'bg-emerald-500',
@@ -187,10 +201,11 @@ function getStatusStyle(priority, mode, orderStatus) {
 }
 
 function getNextStatus(status) {
-  switch (status) {
+  switch (normalizeStatus(status)) {
     case 'PENDING':
       return 'PREPARING'
     case 'PREPARING':
+    case 'PROCESSING':
       return 'READY'
     default:
       return null
@@ -198,10 +213,11 @@ function getNextStatus(status) {
 }
 
 function getActionLabel(status) {
-  switch (status) {
+  switch (normalizeStatus(status)) {
     case 'PENDING':
       return 'Start Preparing'
     case 'PREPARING':
+    case 'PROCESSING':
       return 'Mark Ready'
     case 'READY':
       return 'Ready'
@@ -215,11 +231,13 @@ function getActionLabel(status) {
 }
 
 function mapOrderFromApi(order) {
+  const status = normalizeStatus(order.status)
+
   return {
     id: order.id,
     orderNumber: order.orderNumber || `#${order.id}`,
     customer: order.user?.name || order.studentName || 'Customer',
-    status: order.status,
+    status,
     statusLabel: order.statusLabel,
     elapsedBaseSeconds: Number(order.elapsedSeconds) || 0,
     preparingStartedAt:
@@ -230,7 +248,7 @@ function mapOrderFromApi(order) {
     loadedAt: Date.now(),
     type: order.shortDescription || `${order.totalItems || 0} items`,
     amount: order.totalAmount || 0,
-    priority: getPriorityFromBackend(order.status, order.timeStatus),
+    priority: getPriorityFromBackend(status, order.timeStatus),
     items: (order.items || []).map((item) => ({
       qty: item.quantity || item.qty || 1,
       name: item.name,
@@ -247,14 +265,17 @@ function getElapsedSecondsFromPreparing(order, nowTs) {
     return Math.max(0, Math.floor((nowTs - startedAt) / 1000))
   }
 
-  if (order.status === 'PREPARING') {
+  if (['PREPARING', 'PROCESSING'].includes(normalizeStatus(order.status))) {
     return (
       (order.elapsedBaseSeconds || 0) +
       Math.max(0, Math.floor((nowTs - (order.loadedAt || nowTs)) / 1000))
     )
   }
 
-  if (order.status === 'READY' || order.status === 'COMPLETED') {
+  if (
+    normalizeStatus(order.status) === 'READY' ||
+    normalizeStatus(order.status) === 'COMPLETED'
+  ) {
     return order.elapsedBaseSeconds || 0
   }
 
@@ -531,7 +552,7 @@ export default function KitchenLayout() {
       console.log('[KITCHEN] Orders:', data)
 
       if (Array.isArray(data)) {
-        setOrders(data.map(mapOrderFromApi))
+        setOrders(data.map(mapOrderFromApi).filter(isActiveKitchenOrder))
         return
       }
 
@@ -552,6 +573,10 @@ export default function KitchenLayout() {
     const updatedOrder = mapOrderFromApi(updatedOrderRaw)
 
     setOrders((prev) => {
+      if (!isActiveKitchenOrder(updatedOrder)) {
+        return prev.filter((o) => o.id !== updatedOrder.id)
+      }
+
       const exists = prev.find((o) => o.id === updatedOrder.id)
 
       if (exists) {
@@ -646,10 +671,14 @@ export default function KitchenLayout() {
           )
 
           if (updated?.id) {
+            const normalized = mapOrderFromApi(updated)
+
             setOrders((prev) =>
-              prev.map((order) =>
-                order.id === action.orderId ? mapOrderFromApi(updated) : order
-              )
+              isActiveKitchenOrder(normalized)
+                ? prev.map((order) =>
+                    order.id === action.orderId ? normalized : order
+                  )
+                : prev.filter((order) => order.id !== action.orderId)
             )
           }
         }
@@ -671,28 +700,38 @@ export default function KitchenLayout() {
   }, [isConnected, queuedActions, isFlushingQueue, operationalActionsBlocked])
 
   const counts = useMemo(() => {
+    const activeOrders = orders.filter(isActiveKitchenOrder)
+
     return {
-      all: orders.length,
-      pending: orders.filter((o) => o.status === 'PENDING').length,
-      preparing: orders.filter((o) => o.status === 'PREPARING').length,
+      all: activeOrders.length,
+      pending: activeOrders.filter(
+        (o) => normalizeStatus(o.status) === 'PENDING'
+      ).length,
+      preparing: activeOrders.filter((o) =>
+        ['PREPARING', 'PROCESSING'].includes(normalizeStatus(o.status))
+      ).length,
     }
   }, [orders])
 
   const queueCount = useMemo(
-    () =>
-      orders.filter((o) => ['PENDING', 'PREPARING', 'READY'].includes(o.status))
-        .length,
+    () => orders.filter(isActiveKitchenOrder).length,
     [orders]
   )
 
   const filteredOrders = useMemo(() => {
+    const activeOrders = orders.filter(isActiveKitchenOrder)
+
     switch (filter) {
       case 'PENDING':
-        return orders.filter((o) => o.status === 'PENDING')
+        return activeOrders.filter(
+          (o) => normalizeStatus(o.status) === 'PENDING'
+        )
       case 'PREPARING':
-        return orders.filter((o) => o.status === 'PREPARING')
+        return activeOrders.filter((o) =>
+          ['PREPARING', 'PROCESSING'].includes(normalizeStatus(o.status))
+        )
       default:
-        return orders
+        return activeOrders
     }
   }, [orders, filter])
 
@@ -733,10 +772,12 @@ export default function KitchenLayout() {
       const updated = await kitchenService.updateOrderStatus(orderId, nextStatus)
 
       if (updated?.id) {
+        const normalized = mapOrderFromApi(updated)
+
         setOrders((prev) =>
-          prev.map((order) =>
-            order.id === orderId ? mapOrderFromApi(updated) : order
-          )
+          isActiveKitchenOrder(normalized)
+            ? prev.map((order) => (order.id === orderId ? normalized : order))
+            : prev.filter((order) => order.id !== orderId)
         )
       } else {
         setError('Failed to update order status')
