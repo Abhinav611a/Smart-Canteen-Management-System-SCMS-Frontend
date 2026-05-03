@@ -23,15 +23,16 @@ const DEFAULT_FORM = {
   maxPerOrder: null,
 }
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
 
 function validateImageFile(file) {
   if (!file) return null
-  if (!file.type?.startsWith('image/')) {
-    return 'Choose a valid image file'
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return 'Choose a JPEG, PNG, or WebP image. SVG, GIF, BMP, HEIC, and other image types are not allowed.'
   }
   if (file.size > MAX_IMAGE_SIZE_BYTES) {
-    return 'Image must be 5 MB or smaller'
+    return 'Image must be 2 MB or smaller'
   }
   return null
 }
@@ -394,7 +395,7 @@ export default function AdminMenu() {
             <input
               className="input-field"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleImageChange}
             />
             {formErrors.image && (
