@@ -40,12 +40,15 @@ export const validateRegister = ({ name, email, password, confirmPassword }) => 
   return errors
 }
 
-export const validateMenuItem = ({ name, price, category }) => {
+export const validateMenuItem = ({ name, price, category, itemType, prepTimeMinutes }) => {
   const errors = {}
   if (!isRequired(name))                  errors.name     = 'Item name is required'
   if (!isRequired(price))                 errors.price    = 'Price is required'
   else if (!isPositiveNumber(price))      errors.price    = 'Price must be a positive number'
   if (!isRequired(category))             errors.category = 'Category is required'
+  if (itemType === 'COOKED' && !isPositiveNumber(prepTimeMinutes)) {
+    errors.prepTimeMinutes = 'Prep time must be at least 1 minute'
+  }
   return errors
 }
 

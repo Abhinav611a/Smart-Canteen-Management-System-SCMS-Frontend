@@ -20,6 +20,20 @@ import {
 } from '@/utils/constants'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
+function getPrepBadge(item) {
+  if (item.itemType === 'READY_MADE') {
+    return {
+      label: 'Instant',
+      className: 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
+    }
+  }
+
+  return {
+    label: `Takes ${item.prepTimeMinutes ?? 10} min`,
+    className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+  }
+}
+
 export default function StudentMenu() {
   const { addItem, removeItem, items: cartItems, syncing: cartSyncing } = useCart()
   const { menu, loading, error } = useMenu()
@@ -259,6 +273,7 @@ export default function StudentMenu() {
               const qty = cartQty(item.id)
               const canInteract = item.available && isOrderingAllowed && !cartSyncing
               const showImage = hasUsableImage(item)
+              const prepBadge = getPrepBadge(item)
 
               return (
                 <motion.article
@@ -342,6 +357,9 @@ export default function StudentMenu() {
                     </p>
 
                     <div className="flex items-center gap-3 text-xs">
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 font-semibold ${prepBadge.className}`}>
+                        {prepBadge.label}
+                      </span>
                       {item.rating == null ? (
                         <span className="font-medium text-slate-400">No ratings yet</span>
                       ) : (

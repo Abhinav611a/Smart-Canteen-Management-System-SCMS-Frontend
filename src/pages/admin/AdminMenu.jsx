@@ -18,6 +18,8 @@ const DEFAULT_FORM = {
   price: '',
   emoji: 'ðŸ›',
   description: '',
+  itemType: 'COOKED',
+  prepTimeMinutes: 10,
   isPreparedItem: true,
   imageUrl: null,
   maxPerOrder: null,
@@ -66,16 +68,16 @@ async function uploadMenuImage(file) {
   return data.secure_url
 }
 
-function getFoodTypeMeta(isPreparedItem) {
-  if (isPreparedItem === true) {
-    return { label: 'Cooked', className: 'badge-yellow' }
+function getFoodTypeMeta(item) {
+  if (item.itemType === 'COOKED') {
+    return { label: 'COOKED', prepLabel: `${item.prepTimeMinutes} min`, className: 'badge-yellow' }
   }
 
-  if (isPreparedItem === false) {
-    return { label: 'Readymade', className: 'badge-blue' }
+  if (item.itemType === 'READY_MADE') {
+    return { label: 'READY_MADE', prepLabel: '0 min', className: 'badge-blue' }
   }
 
-  return { label: 'Unknown', className: 'badge-gray' }
+  return { label: 'Unknown', prepLabel: '-', className: 'badge-gray' }
 }
 
 export default function AdminMenu() {
@@ -126,7 +128,9 @@ export default function AdminMenu() {
       price: String(item.price),
       emoji: item.emoji || MENU_CATEGORY_EMOJIS[item.category] || '🍴',
       description: item.description || '',
-      isPreparedItem: item.isPreparedItem ?? true,
+      itemType: item.itemType ?? (item.isPreparedItem ? 'COOKED' : 'READY_MADE'),
+      prepTimeMinutes: String(item.prepTimeMinutes ?? (item.isPreparedItem ? 10 : 0)),
+      isPreparedItem: item.itemType === 'COOKED' || item.isPreparedItem === true,
       imageUrl: item.imageUrl ?? null,
       maxPerOrder: item.maxPerOrder ?? null,
     })
@@ -168,10 +172,13 @@ export default function AdminMenu() {
     setSaving(true)
     try {
       const imageUrl = imageFile ? await uploadMenuImage(imageFile) : form.imageUrl
+      const itemType = form.itemType === 'READY_MADE' ? 'READY_MADE' : 'COOKED'
       const payload = {
         ...form,
         price: parseFloat(form.price),
-        isPreparedItem: form.isPreparedItem === true,
+        itemType,
+        prepTimeMinutes: itemType === 'READY_MADE' ? 0 : Number(form.prepTimeMinutes),
+        isPreparedItem: itemType === 'COOKED',
         imageUrl: imageUrl ?? null,
       }
       if (editing) {
@@ -270,11 +277,14 @@ export default function AdminMenu() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Item</th><th>Category</th><th>Food Type</th><th>Price</th><th>Orders Today</th><th>Rating</th><th>Status</th><th>Actions</th>
+                  <th>Item</th><th>Category</th><th>Food Type</th><th>Prep Time</th><th>Price</th><th>Orders Today</th><th>Rating</th><th>Status</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(item => (
+                {filtered.map(item => {
+                  const typeMeta = getFoodTypeMeta(item)
+
+                  return (
                   <motion.tr key={item.id} layout>
                     <td>
                       <div className="flex items-center gap-3">
@@ -295,10 +305,11 @@ export default function AdminMenu() {
                     </td>
                     <td><span className="badge badge-gray text-[10px]">{MENU_CATEGORY_EMOJIS[item.category]} {MENU_CATEGORY_LABELS[item.category] ?? item.category}</span></td>
                     <td>
-                      <span className={`badge ${getFoodTypeMeta(item.isPreparedItem).className} text-[10px]`}>
-                        {getFoodTypeMeta(item.isPreparedItem).label}
+                      <span className={`badge ${typeMeta.className} text-[10px]`}>
+                        {typeMeta.label}
                       </span>
                     </td>
+                    <td className="text-sm font-medium text-gray-600 dark:text-gray-300">{typeMeta.prepLabel}</td>
                     <td className="font-bold text-gray-900 dark:text-white">{formatCurrency(item.price)}</td>
                     <td>
                       <div className="flex items-center gap-2">
@@ -345,7 +356,8 @@ export default function AdminMenu() {
                       </div>
                     </td>
                   </motion.tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -430,13 +442,33 @@ export default function AdminMenu() {
             <label className="input-label">Food Type</label>
             <select
               className="input-field"
-              value={String(form.isPreparedItem ?? true)}
-              onChange={e => setForm(p => ({ ...p, isPreparedItem: e.target.value === 'true' }))}
+              value={form.itemType}
+              onChange={e => {
+                const itemType = e.target.value
+                setForm(p => ({
+                  ...p,
+                  itemType,
+                  prepTimeMinutes: itemType === 'READY_MADE'
+                    ? 0
+                    : (Number(p.prepTimeMinutes) > 0 ? p.prepTimeMinutes : 10),
+                  isPreparedItem: itemType === 'COOKED',
+                }))
+              }}
             >
-              <option value="true">Cooked</option>
-              <option value="false">Readymade</option>
+              <option value="READY_MADE">READY_MADE</option>
+              <option value="COOKED">COOKED</option>
             </select>
           </div>
+          <Input
+            label="Prep Time (minutes)"
+            type="number"
+            min={form.itemType === 'COOKED' ? '1' : '0'}
+            step="1"
+            value={form.itemType === 'READY_MADE' ? 0 : form.prepTimeMinutes}
+            onChange={e => setForm(p => ({ ...p, prepTimeMinutes: e.target.value }))}
+            error={formErrors.prepTimeMinutes}
+            disabled={form.itemType === 'READY_MADE'}
+          />
           <Input
             label="Description"
             className="col-span-2"

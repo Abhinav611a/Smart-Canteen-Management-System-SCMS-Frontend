@@ -15,17 +15,39 @@ function normalisePreparedItem(value) {
   return null
 }
 
-function toPreparedItemPayload(value) {
-  return value === false || value === 'false' ? false : true
+function normaliseItemType(itemType, isPreparedItem) {
+  if (itemType === 'READY_MADE' || itemType === 'COOKED') {
+    return itemType
+  }
+
+  return normalisePreparedItem(isPreparedItem) ? 'COOKED' : 'READY_MADE'
+}
+
+function normalisePrepTimeMinutes(value, itemType, isPreparedItem) {
+  const fallback = normalisePreparedItem(isPreparedItem) ? 10 : 0
+  const minutes = Number(value ?? fallback)
+
+  if (!Number.isFinite(minutes)) {
+    return itemType === 'COOKED' ? 10 : 0
+  }
+
+  return itemType === 'READY_MADE' ? 0 : minutes
 }
 
 function buildMenuPayload(data) {
+  const itemType = normaliseItemType(data.itemType, data.isPreparedItem)
+  const prepTimeMinutes = itemType === 'READY_MADE'
+    ? 0
+    : Number(data.prepTimeMinutes ?? 10)
+
   const payload = {
     name: data.name,
     foodCategory: data.foodCategory ?? data.category,
     price: Number(data.price),
     imageUrl: data.imageUrl ?? null,
-    isPreparedItem: toPreparedItemPayload(data.isPreparedItem),
+    itemType,
+    prepTimeMinutes,
+    isPreparedItem: itemType === 'COOKED',
   }
 
   if (data.maxPerOrder !== undefined) {
@@ -37,6 +59,13 @@ function buildMenuPayload(data) {
 
 function normaliseItem(item = {}) {
   const cat = item.foodCategory ?? item.category ?? 'MAIN'
+  const itemType = normaliseItemType(item.itemType, item.isPreparedItem)
+  const prepTimeMinutes = normalisePrepTimeMinutes(
+    item.prepTimeMinutes,
+    itemType,
+    item.isPreparedItem
+  )
+
   return {
     id: item.id,
     name: item.name,
@@ -44,7 +73,9 @@ function normaliseItem(item = {}) {
     foodCategory: cat,
     price: Number(item.price ?? 0),
     available: item.available ?? true,
-    isPreparedItem: normalisePreparedItem(item.isPreparedItem),
+    itemType,
+    prepTimeMinutes,
+    isPreparedItem: itemType === 'COOKED',
     emoji: MENU_CATEGORY_EMOJIS[cat] ?? '🍴',
     description: item.description ?? '',
     rating: item.rating == null ? null : Number(item.rating),
