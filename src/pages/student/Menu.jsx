@@ -203,7 +203,10 @@ export default function StudentMenu() {
             />
           </div>
 
-          <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <div
+            className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+            data-swipe-ignore="true"
+          >
             <div className="flex min-w-max gap-2">
               {MENU_CATEGORIES.map((cat) => {
                 const isActive = category === cat

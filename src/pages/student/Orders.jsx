@@ -440,10 +440,18 @@ export default function StudentOrders() {
                   : '',
               ].join(' ')}
             >
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
+                data-swipe-allow="true"
                 className="flex w-full items-start justify-between gap-3 p-4 text-left"
                 onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setExpandedId(isExpanded ? null : order.id)
+                  }
+                }}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -507,7 +515,7 @@ export default function StudentOrders() {
                     )}
                   </p>
                 </div>
-              </button>
+              </div>
 
               <AnimatedDetail open={isExpanded}>
                 <div className="space-y-3 px-4 pb-4">
