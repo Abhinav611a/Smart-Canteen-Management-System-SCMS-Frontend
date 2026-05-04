@@ -165,7 +165,7 @@ export default function StudentMenu() {
   }
 
   return (
-    <div className="space-y-5 pb-24 lg:space-y-6 lg:pb-6">
+    <div className="w-full max-w-full space-y-5 overflow-x-hidden pb-24 lg:space-y-6 lg:pb-6">
       <section className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -196,7 +196,7 @@ export default function StudentMenu() {
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
-              className="w-full rounded-2xl border border-slate-200 bg-slate-100 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:bg-gray-900 dark:focus:ring-emerald-500/10"
+              className="w-full max-w-full rounded-2xl border border-slate-200 bg-slate-100 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:bg-gray-900 dark:focus:ring-emerald-500/10"
               placeholder="Search delicious meals..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -207,7 +207,7 @@ export default function StudentMenu() {
             className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
             data-swipe-ignore="true"
           >
-            <div className="flex min-w-max gap-2">
+            <div className="flex w-max gap-2">
               {MENU_CATEGORIES.map((cat) => {
                 const isActive = category === cat
 
@@ -269,7 +269,7 @@ export default function StudentMenu() {
       {!loading && filtered.length > 0 && (
         <motion.div
           layout
-          className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid w-full max-w-full grid-cols-1 gap-5 overflow-hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           <AnimatePresence>
             {filtered.map((item, i) => {
@@ -287,7 +287,7 @@ export default function StudentMenu() {
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ delay: i * 0.03 }}
                   className={[
-                    'overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200',
+                    'w-full max-w-full overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200',
                     item.available
                       ? 'hover:-translate-y-0.5 hover:shadow-md'
                       : 'opacity-70',
@@ -409,7 +409,7 @@ export default function StudentMenu() {
                         type="button"
                         onClick={() => handleAdd(item)}
                         disabled={!canInteract}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
+                        className="flex w-full max-w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
                       >
                         <Plus size={16} />
                         {canteenLoading

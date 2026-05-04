@@ -355,7 +355,7 @@ export default function StudentOrders() {
   }
 
   return (
-    <div className="animate-fade-in space-y-5">
+    <div className="w-full max-w-full overflow-x-hidden animate-fade-in space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
