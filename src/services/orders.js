@@ -13,13 +13,55 @@ export function extractQrCodeValue(scannedValue = '') {
 
   try {
     const url = new URL(raw)
-    const codeParam = url.searchParams.get('code')
+    const codeParam =
+      url.searchParams.get('code') ||
+      url.searchParams.get('token') ||
+      url.searchParams.get('qr') ||
+      url.searchParams.get('qrCode')
     if (codeParam) return codeParam.trim()
   } catch {
     // Not a URL; use the raw scanned value as-is.
   }
 
   return raw
+}
+
+export function getQrVerifyErrorMessage(error) {
+  const status = error?.response?.status
+  const backendMessage =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    ''
+  const message = String(backendMessage || '').trim()
+  const normalizedMessage = message.toLowerCase()
+
+  if (status === 409) {
+    if (
+      normalizedMessage.includes('already used') ||
+      normalizedMessage.includes('already completed') ||
+      normalizedMessage.includes('already picked') ||
+      normalizedMessage.includes('picked up') ||
+      normalizedMessage.includes('collected') ||
+      normalizedMessage.includes('verified')
+    ) {
+      return 'This order is already picked up'
+    }
+
+    if (
+      normalizedMessage.includes('not ready') ||
+      normalizedMessage.includes('not yet ready')
+    ) {
+      return 'Order is not ready yet'
+    }
+
+    return message || 'Order cannot be verified right now'
+  }
+
+  if (status === 410) return 'QR expired'
+  if (status === 400) return 'Invalid QR code'
+
+  return 'Unable to verify QR. Please try again.'
 }
 
 function normaliseOrderItem(item) {
@@ -138,12 +180,14 @@ export const ordersService = {
     return api.post(ENDPOINTS.REORDER(orderId))
   },
 
-  async verifyOrder(code) {
+  async verifyOrderQr(code) {
     const normalizedCode = extractQrCodeValue(code)
 
-    return api.get(ENDPOINTS.ORDER_VERIFY, {
-      params: { code: normalizedCode },
-    })
+    return api.post(ENDPOINTS.ORDER_VERIFY, { code: normalizedCode })
+  },
+
+  async verifyOrder(code) {
+    return this.verifyOrderQr(code)
   },
 
   async fetchInvoiceAsset(orderId) {

@@ -236,8 +236,9 @@ async validateSession(token) {
     }
 
     try {
-      const response = await scannerApiClient.get(ENDPOINTS.ORDER_VERIFY, {
-        params: { code: normalizedCode },
+      const response = await scannerApiClient.post(ENDPOINTS.ORDER_VERIFY, {
+        code: normalizedCode,
+      }, {
         headers: getScannerAuthHeaders(normalizedToken),
       })
 

@@ -112,10 +112,8 @@ export default function StudentCart() {
   }
 
   const syncCartAfterOrder = async () => {
-    await clearCart({ refetch: false, silent: true })
-
     try {
-      await refreshCart({ silent: true })
+      await clearCart({ silent: true })
     } catch (syncError) {
       console.error('Failed to sync cart after order placement:', syncError)
       toast.error(
@@ -126,7 +124,7 @@ export default function StudentCart() {
 
   const handleDecreaseQty = async (item) => {
     try {
-      await updateQty(item.id, item.qty - 1)
+      await updateQty(item.cartItemId ?? item.id, item.qty - 1)
     } catch {
       // CartContext already shows the failure toast.
     }
@@ -134,7 +132,7 @@ export default function StudentCart() {
 
   const handleIncreaseQty = async (item) => {
     try {
-      await updateQty(item.id, item.qty + 1)
+      await updateQty(item.cartItemId ?? item.id, item.qty + 1)
     } catch {
       // CartContext already shows the failure toast.
     }
@@ -142,7 +140,7 @@ export default function StudentCart() {
 
   const handleRemoveItem = async (item) => {
     try {
-      await removeItem(item.id)
+      await removeItem(item.cartItemId ?? item.id)
     } catch {
       // CartContext already shows the failure toast.
     }

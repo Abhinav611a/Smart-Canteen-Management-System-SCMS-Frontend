@@ -3,7 +3,7 @@ import toast from 'react-hot-toast'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { extractQrCodeValue } from '@/services/orders'
+import { extractQrCodeValue, getQrVerifyErrorMessage } from '@/services/orders'
 
 const AUTO_CLOSE_DELAY_MS = 1500
 const CAMERA_HANDOFF_DELAY_MS = 150
@@ -34,37 +34,7 @@ const delay = (ms) =>
   })
 
 function getVerifyErrorMessage(error) {
-  const message =
-    error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.message ||
-    'Unable to verify this QR code right now.'
-  const normalizedMessage = String(message || '').toLowerCase()
-
-  if (
-    normalizedMessage.includes('already completed') ||
-    normalizedMessage.includes('already collected') ||
-    normalizedMessage.includes('already verified')
-  ) {
-    return 'This order has already been collected.'
-  }
-
-  if (normalizedMessage.includes('expired')) {
-    return 'This QR code has expired. Please refresh the order QR and try again.'
-  }
-
-  if (
-    normalizedMessage.includes('tampered') ||
-    normalizedMessage.includes('invalid qr')
-  ) {
-    return 'Invalid QR code. Please scan the latest order QR.'
-  }
-
-  return message
-}
-
-function isValidOrderQrCode(code = '') {
-  return String(code || '').includes('|')
+  return getQrVerifyErrorMessage(error)
 }
 
 function createCameraIssue(type, overrides = {}) {
@@ -678,22 +648,6 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
       setErrorSource('')
       setCameraIssue(null)
 
-      if (!isValidOrderQrCode(submittedCode)) {
-        const invalidMessage =
-          'Invalid QR code format. Please scan the latest order QR.'
-
-        await stopScanner()
-        toast.error(invalidMessage, { id: 'qr-format-error' })
-        setOrderLabel('')
-        setErrorSource('verify')
-        setCameraIssue(null)
-        setMessage(invalidMessage)
-        setPhase('error')
-        scheduleAutoClose()
-        resetScanTracking()
-        return
-      }
-
       try {
         const result = await onVerify(submittedCode)
         await stopScanner()
@@ -929,6 +883,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
       void stopScanner()
     }
   }, [
+    clearScannerContainer,
     clearCloseTimer,
     open,
     resetCameraState,

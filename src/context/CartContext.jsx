@@ -13,6 +13,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useCanteen } from '@/context/CanteenContext'
 import { cartService } from '@/services/cartService'
 import {
+  getCartMutationId,
   getCartItemIdentity,
   normaliseCartItem,
   normaliseCartItems,
@@ -126,6 +127,7 @@ export function CartProvider({ children }) {
   const hydratedRef = useRef(false)
   const fetchCountRef = useRef(0)
   const mutationCountRef = useRef(0)
+  const removedCartItemIdsRef = useRef(new Set())
 
   useEffect(() => {
     itemsRef.current = state.items
@@ -139,7 +141,17 @@ export function CartProvider({ children }) {
     localStorage.removeItem(LS_KEYS.CART)
   }, [])
 
-  const clearCartState = useCallback(() => {
+  const rememberRemovedCartItems = useCallback((cartItemIds = []) => {
+    cartItemIds.forEach((id) => {
+      const parsed = Number(id)
+      if (Number.isFinite(parsed) && parsed > 0) {
+        removedCartItemIdsRef.current.add(parsed)
+      }
+    })
+  }, [])
+
+  const clearCartState = useCallback((removedCartItemIds = []) => {
+    rememberRemovedCartItems(removedCartItemIds)
     dispatch({ type: 'CLEAR_CART' })
     dispatch({
       type: 'SET_STATUS',
@@ -147,7 +159,7 @@ export function CartProvider({ children }) {
     })
     clearPersistedLocalCart()
     return EMPTY_CART
-  }, [clearPersistedLocalCart])
+  }, [clearPersistedLocalCart, rememberRemovedCartItems])
 
   const syncActivityFlags = useCallback(() => {
     dispatch({
@@ -182,18 +194,58 @@ export function CartProvider({ children }) {
 
   const applyCart = useCallback(
     (cart, { outOfSync = false } = {}) => {
-      const nextItems = normaliseCartItems(cart?.items ?? [], {
+      rememberRemovedCartItems(cart?.removedCartItemIds ?? [])
+
+      const normalizedItems = normaliseCartItems(cart?.items ?? [], {
         previousItems: itemsRef.current,
       })
+      const backendCartItemIds = new Set(
+        normalizedItems
+          .map((item) => Number(getCartMutationId(item)))
+          .filter((id) => Number.isFinite(id) && id > 0),
+      )
+      const staleDeletedCartItemIds = []
+
+      removedCartItemIdsRef.current.forEach((id) => {
+        if (backendCartItemIds.has(id)) {
+          staleDeletedCartItemIds.push(id)
+        } else {
+          removedCartItemIdsRef.current.delete(id)
+        }
+      })
+
+      if (staleDeletedCartItemIds.length > 0) {
+        console.warn('[CartContext] ignoring stale deleted cart item(s) from GET /cart', {
+          staleDeletedCartItemIds,
+        })
+      }
+
+      const nextItems = staleDeletedCartItemIds.length
+        ? normalizedItems.filter(
+            (item) => !removedCartItemIdsRef.current.has(Number(getCartMutationId(item))),
+          )
+        : normalizedItems
+      const total = nextItems.reduce(
+        (sum, item) => sum + (Number(item.price) || 0) * (item.qty || item.quantity || 0),
+        0,
+      )
+      const nextCart = {
+        ...(cart ?? {}),
+        items: nextItems,
+        total,
+        count: nextItems.reduce((sum, item) => sum + (item.qty || item.quantity || 0), 0),
+        staleDeletedCartItemIds,
+      }
+
       dispatch({ type: 'SET_CART', items: nextItems })
       dispatch({
         type: 'SET_STATUS',
-        value: { outOfSync },
+        value: { outOfSync: outOfSync || staleDeletedCartItemIds.length > 0 },
       })
       persistLocalCart(nextItems)
-      return cart ?? buildCartSummary(nextItems)
+      return nextCart
     },
-    [persistLocalCart],
+    [persistLocalCart, rememberRemovedCartItems],
   )
 
   const syncFromBackend = useCallback(
@@ -428,24 +480,27 @@ export function CartProvider({ children }) {
       }
 
       const currentItems = normaliseCartItems(itemsRef.current)
+      const currentCartItemIds = currentItems
+        .map((item) => getCartMutationId(item))
+        .filter((id) => Number.isFinite(Number(id)) && Number(id) > 0)
 
       if (!currentItems.length) {
         return clearCartState()
       }
 
       if (clearLocalOnly) {
-        clearCartState()
+        clearCartState(currentCartItemIds)
         return EMPTY_CART
       }
 
       if (!cartService.isBackendEnabled() || !isCartRole) {
-        clearCartState()
+        clearCartState(currentCartItemIds)
         return EMPTY_CART
       }
 
       const previousCart = buildCartSummary(currentItems)
 
-      clearCartState()
+      clearCartState(currentCartItemIds)
       beginMutation()
 
       try {

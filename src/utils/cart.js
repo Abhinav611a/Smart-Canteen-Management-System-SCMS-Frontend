@@ -42,10 +42,14 @@ function getFoodItemId(item = {}) {
 
 function getCartRowId(item = {}) {
   return (
-    toPositiveId(item?.id) ??
     toPositiveId(item?.cartItemId) ??
-    toPositiveId(item?.cartItem?.id)
+    toPositiveId(item?.cartItem?.id) ??
+    toPositiveId(item?.id)
   )
+}
+
+export function getCartMutationId(item = {}) {
+  return getCartRowId(item)
 }
 
 export function getCartItemIdentity(item = {}) {

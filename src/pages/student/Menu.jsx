@@ -82,7 +82,7 @@ export default function StudentMenu() {
 
         map.set(menuItemId, {
           qty: quantity,
-          cartItemId: cartItem.id,
+          cartItemId: cartItem.cartItemId ?? cartItem.id,
         })
 
         return map

@@ -142,8 +142,10 @@ export default function ChefOrders() {
   )
 
   const handleVerifyQr = useCallback(async (code) => {
-    return await ordersService.verifyOrder(code)
-  }, [])
+    const result = await ordersService.verifyOrderQr(code)
+    await refetch()
+    return result
+  }, [refetch])
 
   const handleOpenPhoneScanner = async () => {
     if (phoneScannerSession?.token && phoneScannerSession?.scannerUrl) {

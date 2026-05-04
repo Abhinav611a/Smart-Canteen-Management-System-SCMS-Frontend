@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Button from '@/components/ui/Button'
-import { extractQrCodeValue } from '@/services/orders'
+import { extractQrCodeValue, getQrVerifyErrorMessage } from '@/services/orders'
 import {
   isScannerSessionExpiredError,
   managerScannerService,
@@ -81,41 +81,7 @@ function loadHtml5QrcodeLibrary() {
 }
 
 function getVerifyErrorMessage(error) {
-  const message =
-    error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.message ||
-    'Unable to verify this QR code right now.'
-  const normalizedMessage = String(message || '').toLowerCase()
-
-  if (
-    normalizedMessage.includes('already completed') ||
-    normalizedMessage.includes('already collected') ||
-    normalizedMessage.includes('already verified')
-  ) {
-    return 'This order has already been collected.'
-  }
-
-  if (normalizedMessage.includes('expired')) {
-    return 'This QR code has expired. Please refresh the order QR and try again.'
-  }
-
-  if (
-    normalizedMessage.includes('tampered') ||
-    normalizedMessage.includes('invalid qr')
-  ) {
-    return 'Invalid QR code. Please scan the latest order QR.'
-  }
-
-  return String(message || '').trim() || 'Unable to verify this QR code right now.'
-}
-
-function isKnownInvalidQrError(error) {
-  return error?.response?.status === 410
-}
-
-function getKnownInvalidQrMessage() {
-  return 'QR already used or expired.'
+  return getQrVerifyErrorMessage(error)
 }
 
 function getSessionExpiredMessage(error) {
@@ -160,10 +126,6 @@ function getCameraErrorMessage(error) {
     String(error?.message || '').trim() ||
     'Unable to start the camera scanner on this device.'
   )
-}
-
-function isValidOrderQrCode(code = '') {
-  return String(code || '').includes('|')
 }
 
 function getOrderLabel(result) {
@@ -480,26 +442,6 @@ export default function ExternalScanner() {
       setBannerMessage('Sending this scan to the backend...')
       setLastResultLabel('')
 
-      if (!isValidOrderQrCode(normalizedCode)) {
-        const invalidMessage =
-          'Invalid QR code format. Scan the latest order QR and try again.'
-
-        console.log('[ExternalScanner] Scan rejected by QR format validation', {
-          normalizedCode,
-        })
-        setPhase('scanning')
-        setBannerTone('error')
-        setBannerTitle('Scan failed')
-        setBannerMessage(invalidMessage)
-        toast.error(invalidMessage, { id: 'external-scanner-invalid-qr' })
-
-        window.setTimeout(() => {
-          processingRef.current = false
-          scheduleReadyBanner()
-        }, FEEDBACK_HOLD_MS)
-        return
-      }
-
       let pausedAfterFailure = false
 
       try {
@@ -539,16 +481,14 @@ export default function ExternalScanner() {
           normalizedCode,
           error,
         })
-        const knownInvalidQr = isKnownInvalidQrError(error)
-        const errorMessage = knownInvalidQr
-          ? getKnownInvalidQrMessage()
-          : getVerifyErrorMessage(error)
+        const shouldPauseScan = [400, 409, 410].includes(error?.response?.status)
+        const errorMessage = getVerifyErrorMessage(error)
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate(120)
         }
 
-        if (knownInvalidQr) {
+        if (shouldPauseScan) {
           pausedAfterFailure = true
           failedCodeLockRef.current = normalizedCode
           await pauseScanner()

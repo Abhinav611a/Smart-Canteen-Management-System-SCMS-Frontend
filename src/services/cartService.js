@@ -1,7 +1,7 @@
 import api from './api'
 import { ENDPOINTS, LS_KEYS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
-import { normaliseCartItem, normaliseCartItems } from '@/utils/cart'
+import { getCartMutationId, normaliseCartItem, normaliseCartItems } from '@/utils/cart'
 
 const CHECKOUT_INVALID_MESSAGE =
   'Some cart items could not be checked out. We refreshed your cart. Please review it and try again.'
@@ -50,6 +50,34 @@ function summariseNormalizedCartItems(items = []) {
       Number(item.foodItemId) === Number(item.cartItemId),
     usedFallbackName: item.name === 'Item',
   }))
+}
+
+function getCartItemIds(items = []) {
+  return new Set(
+    (Array.isArray(items) ? items : [])
+      .map((item) => Number(getCartMutationId(item)))
+      .filter((id) => Number.isFinite(id) && id > 0),
+  )
+}
+
+function withRemovedCartItems(cart, removedCartItemIds = [], context = 'cart mutation') {
+  const removedIds = removedCartItemIds
+    .map(Number)
+    .filter((id) => Number.isFinite(id) && id > 0)
+  const backendIds = getCartItemIds(cart?.items ?? [])
+  const staleDeletedCartItemIds = removedIds.filter((id) => backendIds.has(id))
+
+  if (staleDeletedCartItemIds.length > 0) {
+    console.warn(`[cartService] GET /cart returned deleted cart item(s) after ${context}`, {
+      staleDeletedCartItemIds,
+    })
+  }
+
+  return {
+    ...(cart ?? { id: null, items: [], total: 0, count: 0, amount: 0 }),
+    removedCartItemIds: removedIds,
+    staleDeletedCartItemIds,
+  }
 }
 
 function getDuplicateFoodItemIds(items = []) {
@@ -107,7 +135,7 @@ export function createCartSnapshot(cartLike = []) {
   return items
     .map(normaliseCartItem)
     .map((item) => ({
-      cartItemId: String(item.id ?? item.cartItemId ?? ''),
+      cartItemId: String(item.cartItemId ?? item.id ?? ''),
       foodItemId: String(item.foodItemId ?? ''),
       qty: Number(item.qty ?? item.quantity ?? 0),
       price: Number(item.price ?? 0),
@@ -214,9 +242,9 @@ function getCheckoutItemName(item = {}) {
 
 function getCheckoutItemCartRowId(item = {}) {
   return (
-    toOptionalNumber(item?.id) ??
     toOptionalNumber(item?.cartItemId) ??
     toOptionalNumber(item?.cartItem?.id) ??
+    toOptionalNumber(item?.id) ??
     null
   )
 }
@@ -458,7 +486,7 @@ export const cartService = {
   },
 
   async updateItem(item, quantity) {
-    const cartItemId = Number(item?.id)
+    const cartItemId = Number(getCartMutationId(item))
 
     if (!cartItemId || cartItemId <= 0) {
       console.error('Invalid cartItemId for cart update:', item)
@@ -470,25 +498,34 @@ export const cartService = {
   },
 
   async removeItem(item) {
-    const cartItemId = Number(item?.id)
+    const cartItemId = Number(getCartMutationId(item))
 
     if (!cartItemId || cartItemId <= 0) {
       console.error('Invalid cartItemId for cart remove:', item)
       throw new Error('Invalid cartItemId for cart remove')
     }
 
-    await api.delete(ENDPOINTS.CART_ITEM(cartItemId))
-    return this.getCart()
+    const response = await api.delete(ENDPOINTS.CART_ITEM(cartItemId))
+    console.debug('[cartService] deleted cart item', { cartItemId, response })
+    const cart = await this.getCart()
+    return withRemovedCartItems(cart, [cartItemId], 'remove')
   },
 
   async clearCart(items = [], { refetch = true } = {}) {
-    const results = await Promise.allSettled(
-      items.map((item) => {
-        const cartItemId = Number(item?.id)
+    const deleteTargets = items.map((item) => ({
+      cartItemId: Number(getCartMutationId(item)),
+      item,
+    }))
 
+    console.debug('[cartService] clearing cart item ids', {
+      cartItemIds: deleteTargets.map((target) => target.cartItemId),
+    })
+
+    const results = await Promise.allSettled(
+      deleteTargets.map(({ cartItemId, item }) => {
         if (!cartItemId || cartItemId <= 0) {
           console.error('Invalid cartItemId for cart clear:', item)
-          throw new Error('Invalid cartItemId for cart clear')
+          return Promise.reject(new Error('Invalid cartItemId for cart clear'))
         }
 
         return api.delete(ENDPOINTS.CART_ITEM(cartItemId))
@@ -496,23 +533,33 @@ export const cartService = {
     )
 
     const failed = results.find((result) => result.status === 'rejected')
+    const removedCartItemIds = results
+      .map((result, index) =>
+        result.status === 'fulfilled' ? deleteTargets[index].cartItemId : null,
+      )
+      .filter((id) => Number.isFinite(id) && id > 0)
 
     if (!refetch && !failed) {
-      return { id: null, items: [], total: 0, count: 0, amount: 0 }
+      return withRemovedCartItems(
+        { id: null, items: [], total: 0, count: 0, amount: 0 },
+        removedCartItemIds,
+        'clear without refetch',
+      )
     }
 
     const cart = await this.getCart()
+    const verifiedCart = withRemovedCartItems(cart, removedCartItemIds, 'clear')
 
-    if (failed && cart.items.length > 0) {
+    if (failed && verifiedCart.items.length > 0) {
       const reason = failed.reason
       const error =
         reason instanceof Error ? reason : new Error('Failed to clear cart.')
 
-      error.latestCart = cart
+      error.latestCart = verifiedCart
       throw error
     }
 
-    return cart
+    return verifiedCart
   },
 
   async checkout(data = {}) {
