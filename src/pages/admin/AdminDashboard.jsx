@@ -15,6 +15,13 @@ import StatCard from '@/components/ui/StatCard'
 import RevenueAreaChart from '@/components/charts/RevenueAreaChart'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 import { CHART_COLORS, PIE_COLORS, ORDER_STATUS } from '@/utils/constants'
+import {
+  Clock3,
+  IndianRupee,
+  LayoutDashboard,
+  Package,
+  Utensils,
+} from 'lucide-react'
 
 export default function AdminDashboard() {
   // Use analytics data — avoids duplicate GET /orders call that AdminOrders also makes
@@ -28,7 +35,10 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="section-title">Admin Dashboard ⚙️</h2>
+        <h2 className="section-title inline-flex items-center gap-2">
+          <LayoutDashboard className="h-5 w-5 text-brand-500" aria-hidden="true" />
+          Admin Dashboard
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">System overview · Live analytics</p>
       </div>
 
@@ -40,10 +50,10 @@ export default function AdminDashboard() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { icon: '💰', label: 'Week Revenue',   value: formatCurrency(weekRevenue), trend: 14, color: 'green'  },
-            { icon: '📦', label: 'Total Orders',   value: totalOrders,                trend: 8,  color: 'blue'   },
-            { icon: '⏳', label: 'Pending Orders', value: pendingOrders,                          color: 'amber'  },
-            { icon: '🍽', label: 'Menu Items',     value: topItems.length,                        color: 'violet' },
+            { icon: IndianRupee, label: 'Week Revenue',   value: formatCurrency(weekRevenue), trend: 14, color: 'green'  },
+            { icon: Package, label: 'Total Orders',   value: totalOrders,                trend: 8,  color: 'blue'   },
+            { icon: Clock3, label: 'Pending Orders', value: pendingOrders,                          color: 'amber'  },
+            { icon: Utensils, label: 'Menu Items',     value: topItems.length,                        color: 'violet' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
               <StatCard {...s} />

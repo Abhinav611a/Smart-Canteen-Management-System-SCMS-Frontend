@@ -10,6 +10,17 @@ import { useOrders } from '@/hooks/useOrders'
 import { ordersService, canAccessInvoice } from '@/services/orders'
 import { getInitials, formatCurrency } from '@/utils/helpers'
 import { SkeletonCard } from '@/components/ui/Skeleton'
+import {
+  CircleCheck,
+  ClipboardList,
+  IndianRupee,
+  LogOut,
+  Mail,
+  ReceiptText,
+  RotateCcw,
+  ShieldCheck,
+  User,
+} from 'lucide-react'
 
 export default function StudentProfile() {
   const { user, logout } = useAuth()
@@ -28,25 +39,25 @@ export default function StudentProfile() {
 
   const stats = [
     {
-      icon: '📦',
+      icon: ClipboardList,
       label: 'Total Orders',
       value: orders.length,
       color: 'text-blue-600 dark:text-blue-400',
     },
     {
-      icon: '💰',
+      icon: IndianRupee,
       label: 'Total Spent',
       value: formatCurrency(totalSpent),
       color: 'text-green-600 dark:text-green-400',
     },
     {
-      icon: '✅',
+      icon: CircleCheck,
       label: 'Completed',
       value: completed,
       color: 'text-emerald-600 dark:text-emerald-400',
     },
     {
-      icon: '🔄',
+      icon: RotateCcw,
       label: 'Active Orders',
       value: activeCount,
       color: 'text-amber-600 dark:text-amber-400',
@@ -73,7 +84,8 @@ export default function StudentProfile() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 animate-fade-in">
-      <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+      <h2 className="inline-flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
+        <User className="h-5 w-5 text-emerald-500" aria-hidden="true" />
         My Profile 👤
       </h2>
 
@@ -102,6 +114,7 @@ export default function StudentProfile() {
             onClick={handleLogout}
             className="hidden items-center gap-1.5 rounded-xl border border-red-200 px-3 py-1.5 text-sm text-red-400 transition-colors hover:text-red-500 dark:border-red-800 sm:flex"
           >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
             Sign out
           </button>
         </div>
@@ -115,20 +128,26 @@ export default function StudentProfile() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
-            >
-              <span className="text-2xl">{s.icon}</span>
-              <div>
-                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {s.label}
-                </p>
+          {stats.map((s) => {
+            const Icon = s.icon
+
+            return (
+              <div
+                key={s.label}
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+              >
+                <span className={s.color}>
+                  {Icon && <Icon className="h-5 w-5" aria-hidden="true" />}
+                </span>
+                <div>
+                  <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {s.label}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -138,27 +157,33 @@ export default function StudentProfile() {
         </h3>
         <div className="space-y-2 text-sm">
           {[
-            { label: 'Name', value: user?.name },
-            { label: 'Email', value: user?.email },
+            { label: 'Name', value: user?.name, icon: User },
+            { label: 'Email', value: user?.email, icon: Mail },
             {
               label: 'Role',
               value:
                 user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1),
+              icon: ShieldCheck,
             },
-            { label: 'User ID', value: `#${user?.id}` },
-          ].map((row) => (
-            <div
-              key={row.label}
-              className="flex justify-between border-b border-slate-100 py-2 last:border-0 dark:border-gray-800"
-            >
-              <span className="text-slate-500 dark:text-slate-400">
-                {row.label}
-              </span>
-              <span className="font-medium text-slate-900 dark:text-white">
-                {row.value}
-              </span>
-            </div>
-          ))}
+            { label: 'User ID', value: `#${user?.id}`, icon: User },
+          ].map((row) => {
+            const Icon = row.icon
+
+            return (
+              <div
+                key={row.label}
+                className="flex justify-between border-b border-slate-100 py-2 last:border-0 dark:border-gray-800"
+              >
+                <span className="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                  {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
+                  {row.label}
+                </span>
+                <span className="font-medium text-slate-900 dark:text-white">
+                  {row.value}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -204,8 +229,9 @@ export default function StudentProfile() {
                       downloadingInvoiceId === o.id ||
                       !canAccessInvoice(o)
                     }
-                    className="rounded-lg border border-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
+                    <ReceiptText className="h-3.5 w-3.5" aria-hidden="true" />
                     {downloadingInvoiceId === o.id
                       ? 'Downloading...'
                       : 'Invoice'}
@@ -221,7 +247,10 @@ export default function StudentProfile() {
         onClick={handleLogout}
         className="w-full rounded-xl border border-red-200 py-3 text-sm font-medium text-red-400 transition-colors hover:text-red-500 dark:border-red-800 sm:hidden"
       >
-        Sign Out
+        <span className="inline-flex items-center justify-center gap-2">
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+          Sign Out
+        </span>
       </button>
     </div>
   )

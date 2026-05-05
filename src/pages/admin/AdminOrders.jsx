@@ -10,17 +10,40 @@ import {
   ENDPOINTS,
   ORDER_STATUS,
   ORDER_STATUS_COLORS,
-  ORDER_STATUS_ICONS,
   ORDER_STATUS_LABELS,
 } from '@/utils/constants'
 import Pagination from '@/components/ui/Pagination'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import Button from '@/components/ui/Button'
+import {
+  BadgeCheck,
+  CheckCircle2,
+  CircleX,
+  ClipboardList,
+  Clock3,
+  IndianRupee,
+  RefreshCw,
+  Search,
+  TriangleAlert,
+} from 'lucide-react'
 
 const EXTRA_STATUS = 'PAYMENT_PENDING'
 const STATUSES = ['ALL', ...new Set([EXTRA_STATUS, ...Object.values(ORDER_STATUS)])]
 const UTC_TIMESTAMP_WITHOUT_ZONE =
   /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/
+
+function StatusIcon({ status, className = 'h-3.5 w-3.5' }) {
+  const icons = {
+    [ORDER_STATUS.PENDING]: Clock3,
+    [ORDER_STATUS.PREPARING]: RefreshCw,
+    [ORDER_STATUS.READY]: BadgeCheck,
+    [ORDER_STATUS.COMPLETED]: CheckCircle2,
+    [ORDER_STATUS.CANCELLED]: CircleX,
+    [EXTRA_STATUS]: IndianRupee,
+  }
+  const Icon = icons[status] || Clock3
+  return <Icon className={className} aria-hidden="true" />
+}
 
 function isPaymentPending(order) {
   const directStatus = String(order?.status ?? '').toUpperCase()
@@ -157,7 +180,10 @@ export default function AdminOrders() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h2 className="section-title">All Orders 📦</h2>
+        <h2 className="section-title inline-flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-brand-500" aria-hidden="true" />
+          All Orders
+        </h2>
         <div className="glass-card p-4">
           <SkeletonTable rows={8} />
         </div>
@@ -168,7 +194,7 @@ export default function AdminOrders() {
   if (error) {
     return (
       <div className="text-center py-16">
-        <p className="text-4xl mb-3">⚠️</p>
+        <TriangleAlert className="mx-auto mb-3 h-12 w-12 text-amber-500" aria-hidden="true" />
         <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
         <Button variant="secondary" onClick={refetch}>
           Retry
@@ -181,7 +207,10 @@ export default function AdminOrders() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="section-title">All Orders 📦</h2>
+          <h2 className="section-title inline-flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-brand-500" aria-hidden="true" />
+            All Orders
+          </h2>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {filtered.length} orders {statusFilter !== 'ALL' ? `(${statusFilter})` : ''}
@@ -196,16 +225,14 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={refetch} icon="🔄">
+        <Button variant="ghost" size="sm" onClick={refetch} icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
           Refresh
         </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <div className="relative max-w-sm flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-            🔍
-          </span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
 
           <input
             className="input-field pl-10"
@@ -229,11 +256,9 @@ export default function AdminOrders() {
                   : 'bg-white dark:bg-gray-900 text-gray-500 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
-              {status === EXTRA_STATUS
-                ? '💵 '
-                : status !== 'ALL'
-                  ? `${ORDER_STATUS_ICONS[status] || ''} `
-                  : ''}
+              {status !== 'ALL' && (
+                <StatusIcon status={status} className="mr-1 inline h-3.5 w-3.5" />
+              )}
               {status}
             </button>
           ))}
@@ -262,7 +287,6 @@ export default function AdminOrders() {
 
                 const cfg = {
                   color: ORDER_STATUS_COLORS[statusKey] ?? 'badge-gray',
-                  icon: ORDER_STATUS_ICONS[statusKey] ?? '',
                   label:
                     order?.statusLabel ||
                     ORDER_STATUS_LABELS[statusKey] ||
@@ -294,11 +318,13 @@ export default function AdminOrders() {
                     <td>
                       {displayStatus === EXTRA_STATUS ? (
                         <span className="badge badge-gray">
-                          💵 PAYMENT_PENDING
+                          <IndianRupee className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
+                          PAYMENT_PENDING
                         </span>
                       ) : (
                         <span className={`badge ${cfg.color}`}>
-                          {cfg.icon} {cfg.label}
+                          <StatusIcon status={statusKey} className="mr-1 inline h-3.5 w-3.5" />
+                          {cfg.label}
                         </span>
                       )}
                     </td>

@@ -1,5 +1,25 @@
+import { cloneElement, createElement, isValidElement } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { X } from 'lucide-react'
+
+function renderNavIcon(icon) {
+  if (!icon) return null
+  if (typeof icon === 'string' || typeof icon === 'number') return icon
+  if (isValidElement(icon)) {
+    return cloneElement(icon, {
+      className: ['h-4 w-4', icon.props.className].filter(Boolean).join(' '),
+      'aria-hidden': icon.props['aria-hidden'] ?? 'true',
+    })
+  }
+  if (typeof icon === 'function' || (typeof icon === 'object' && icon.$$typeof)) {
+    return createElement(icon, {
+      className: 'h-4 w-4',
+      'aria-hidden': 'true',
+    })
+  }
+  return null
+}
 
 export default function Sidebar({ navItems, open, onClose }) {
   const { user } = useAuth()
@@ -27,15 +47,19 @@ export default function Sidebar({ navItems, open, onClose }) {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-5 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-brand-500 flex items-center justify-center text-white text-base">
-              🍽
-            </div>
-            <div>
-              <p className="font-bold text-gray-900 dark:text-white leading-none text-sm">CanteenDAO</p>
-            </div>
+          <div className="flex items-center gap-3">
+            <img
+              src="/brand-icon.svg"
+              alt="CanteenDAO"
+              className="h-9 w-9 shrink-0 rounded-xl shadow-sm"
+            />
+            <span className="text-base font-bold leading-none tracking-tight text-gray-900 dark:text-white">
+              CanteenDAO
+            </span>
           </div>
-          <button onClick={onClose} className="lg:hidden btn-ghost p-1.5">✕</button>
+          <button onClick={onClose} className="lg:hidden btn-ghost p-1.5" aria-label="Close sidebar">
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
 
         {/* Nav */}
@@ -57,7 +81,9 @@ export default function Sidebar({ navItems, open, onClose }) {
                   `nav-item ${isActive ? 'active' : ''}`
                 }
               >
-                <span className="text-lg w-5 text-center">{item.icon}</span>
+                <span className="flex w-5 items-center justify-center text-gray-400 dark:text-gray-500">
+                  {renderNavIcon(item.icon)}
+                </span>
                 <span>{item.label}</span>
                 {item.badge !== undefined && item.badge > 0 && (
                   <span className="ml-auto bg-brand-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">

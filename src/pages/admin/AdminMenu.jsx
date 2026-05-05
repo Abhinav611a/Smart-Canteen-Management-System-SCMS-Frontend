@@ -10,6 +10,19 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { SkeletonTable } from '@/components/ui/Skeleton'
+import {
+  BadgeCheck,
+  CircleX,
+  Clock,
+  Edit3,
+  Flame,
+  PackageCheck,
+  Plus,
+  Search,
+  Star,
+  Trash2,
+  Utensils,
+} from 'lucide-react'
 
 const DEFAULT_FORM = {
   name: '',
@@ -217,18 +230,21 @@ export default function AdminMenu() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="section-title">Manage Menu 🍴</h2>
+          <h2 className="section-title inline-flex items-center gap-2">
+            <Utensils className="h-5 w-5 text-brand-500" aria-hidden="true" />
+            Manage Menu
+          </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {menu.length} items · {menu.filter(i => i.available).length} available
           </p>
         </div>
-        <Button icon="➕" onClick={openAdd}>Add Item</Button>
+        <Button icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={openAdd}>Add Item</Button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative max-w-xs flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
           <input
             className="input-field pl-10"
             placeholder="Search items…"
@@ -306,36 +322,56 @@ export default function AdminMenu() {
                     <td><span className="badge badge-gray text-[10px]">{MENU_CATEGORY_EMOJIS[item.category]} {MENU_CATEGORY_LABELS[item.category] ?? item.category}</span></td>
                     <td>
                       <span className={`badge ${typeMeta.className} text-[10px]`}>
+                        <PackageCheck className="mr-1 h-3 w-3" aria-hidden="true" />
                         {typeMeta.label}
                       </span>
                     </td>
-                    <td className="text-sm font-medium text-gray-600 dark:text-gray-300">{typeMeta.prepLabel}</td>
+                    <td className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                        {typeMeta.prepLabel}
+                      </span>
+                    </td>
                     <td className="font-bold text-gray-900 dark:text-white">{formatCurrency(item.price)}</td>
                     <td>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-900 dark:text-white">{item.ordersToday}</span>
-                        {item.ordersToday > 30 && <span className="text-xs text-amber-500">🔥</span>}
+                        {item.ordersToday > 30 && <Flame className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />}
                       </div>
                     </td>
                     <td>
                       {item.rating == null ? (
                         <span className="text-xs font-medium text-gray-400 dark:text-gray-500">No ratings yet</span>
                       ) : (
-                        <span className="text-amber-500 font-semibold">⭐ {item.rating}</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-amber-500">
+                          <Star className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true" />
+                          {item.rating}
+                        </span>
                       )}
                     </td>
                     <td>
                       <span className={item.available ? 'badge badge-green' : 'badge badge-red'}>
-                        {item.available ? '✅ On' : '❌ Off'}
+                        {item.available ? (
+                          <span className="inline-flex items-center gap-1">
+                            <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                            On
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            <CircleX className="h-3.5 w-3.5" aria-hidden="true" />
+                            Off
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => openEdit(item)}
+                          aria-label={`Edit ${item.name}`}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-colors font-medium"
                         >
-                          ✏️
+                          <Edit3 className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => handleToggle(item)}
@@ -349,9 +385,10 @@ export default function AdminMenu() {
                         </button>
                         <button
                           onClick={() => handleDelete(item)}
+                          aria-label={`Delete ${item.name}`}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-400 hover:text-red-600 transition-colors font-medium"
                         >
-                          🗑
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
                       </div>
                     </td>
@@ -363,7 +400,7 @@ export default function AdminMenu() {
           </div>
           {filtered.length === 0 && (
             <div className="text-center py-12 text-gray-400">
-              <p className="text-3xl mb-2">🍽</p>
+              <Utensils className="mx-auto mb-2 h-10 w-10 text-gray-300 dark:text-gray-600" aria-hidden="true" />
               <p className="text-sm">No items match your filter.</p>
             </div>
           )}

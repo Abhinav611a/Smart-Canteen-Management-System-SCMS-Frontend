@@ -9,6 +9,13 @@ import StatCard from '@/components/ui/StatCard'
 import RevenueAreaChart from '@/components/charts/RevenueAreaChart'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 import { CHART_COLORS, PIE_COLORS } from '@/utils/constants'
+import {
+  BarChart3,
+  CalendarDays,
+  IndianRupee,
+  Package,
+  Utensils,
+} from 'lucide-react'
 
 const T = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -38,7 +45,10 @@ export default function AdminAnalytics() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="section-title">Analytics 📈</h2>
+        <h2 className="section-title inline-flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-brand-500" aria-hidden="true" />
+          Analytics
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue, orders & category insights</p>
       </div>
 
@@ -49,10 +59,10 @@ export default function AdminAnalytics() {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon="💰" label={`${period === 'monthly' ? '7-Month' : 'Weekly'} Revenue`} value={formatCurrency(totalRevenue)} trend={18} color="green" />
-          <StatCard icon="📅" label="Avg Revenue"   value={formatCurrency(avgRevenue)}                                                  trend={6}  color="blue"   />
-          <StatCard icon="📦" label="Total Orders"   value={totalOrders}                                                                            color="amber"  />
-          <StatCard icon="🍽" label="Top Selling"    value={topItems[0]?.name ?? '—'}                                                               color="violet" />
+          <StatCard icon={IndianRupee} label={`${period === 'monthly' ? '7-Month' : 'Weekly'} Revenue`} value={formatCurrency(totalRevenue)} trend={18} color="green" />
+          <StatCard icon={CalendarDays} label="Avg Revenue"   value={formatCurrency(avgRevenue)}                                                  trend={6}  color="blue"   />
+          <StatCard icon={Package} label="Total Orders"   value={totalOrders}                                                                            color="amber"  />
+          <StatCard icon={Utensils} label="Top Selling"    value={topItems[0]?.name ?? '—'}                                                               color="violet" />
         </div>
       )}
 
@@ -146,7 +156,10 @@ export default function AdminAnalytics() {
       {/* Category Sales — replaces "Vendor Performance" (no /analytics/vendors endpoint) */}
       <div className="glass-card overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="font-semibold text-gray-900 dark:text-white">🍽 Category Sales</h3>
+          <h3 className="inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+            <Utensils className="h-4 w-4 text-brand-500" aria-hidden="true" />
+            Category Sales
+          </h3>
         </div>
         {loading ? (
           <div className="p-4 space-y-3">
@@ -202,20 +215,27 @@ export default function AdminAnalytics() {
 
       {/* Order Status Breakdown */}
       <div className="glass-card p-5">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-4">📊 Order Status Breakdown</h3>
+        <h3 className="mb-4 inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+          <BarChart3 className="h-4 w-4 text-brand-500" aria-hidden="true" />
+          Order Status Breakdown
+        </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Orders',   value: totalOrders,                                                                               icon: '📦', color: CHART_COLORS.blue    },
-            { label: 'Total Revenue',  value: formatCurrency(totalRevenue),                                                              icon: '💰', color: CHART_COLORS.primary },
-            { label: 'Avg Revenue',    value: formatCurrency(avgRevenue),                                                                icon: '📅', color: CHART_COLORS.amber   },
-            { label: 'Top Category',   value: categories[0]?.name ?? '—',                                                               icon: '🍽', color: CHART_COLORS.cyan    },
-          ].map(s => (
-            <div key={s.label} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 text-center">
-              <div className="text-2xl mb-2">{s.icon}</div>
-              <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{s.label}</p>
-            </div>
-          ))}
+            { label: 'Total Orders',   value: totalOrders,                                                                               icon: Package, color: CHART_COLORS.blue    },
+            { label: 'Total Revenue',  value: formatCurrency(totalRevenue),                                                              icon: IndianRupee, color: CHART_COLORS.primary },
+            { label: 'Avg Revenue',    value: formatCurrency(avgRevenue),                                                                icon: CalendarDays, color: CHART_COLORS.amber   },
+            { label: 'Top Category',   value: categories[0]?.name ?? '—',                                                               icon: Utensils, color: CHART_COLORS.cyan    },
+          ].map(s => {
+            const Icon = s.icon
+
+            return (
+              <div key={s.label} className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 text-center">
+                {Icon && <Icon className="mx-auto mb-2 h-5 w-5" style={{ color: s.color }} aria-hidden="true" />}
+                <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{s.label}</p>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

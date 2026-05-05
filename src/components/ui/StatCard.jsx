@@ -1,3 +1,23 @@
+import { cloneElement, createElement, isValidElement } from 'react'
+
+function renderStatIcon(icon) {
+  if (!icon) return null
+  if (typeof icon === 'string' || typeof icon === 'number') return icon
+  if (isValidElement(icon)) {
+    return cloneElement(icon, {
+      className: ['h-5 w-5', icon.props.className].filter(Boolean).join(' '),
+      'aria-hidden': icon.props['aria-hidden'] ?? 'true',
+    })
+  }
+  if (typeof icon === 'function' || (typeof icon === 'object' && icon.$$typeof)) {
+    return createElement(icon, {
+      className: 'h-5 w-5',
+      'aria-hidden': 'true',
+    })
+  }
+  return null
+}
+
 export default function StatCard({ icon, label, value, sub, trend, color = 'green' }) {
   const colors = {
     green:  'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',
@@ -10,8 +30,8 @@ export default function StatCard({ icon, label, value, sub, trend, color = 'gree
   return (
     <div className="stat-card animate-slide-up">
       <div className="flex items-start justify-between">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${colors[color]}`}>
-          {icon}
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors[color]}`}>
+          {renderStatIcon(icon)}
         </div>
         {trend !== undefined && (
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${

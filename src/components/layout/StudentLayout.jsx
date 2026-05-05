@@ -9,11 +9,12 @@ import {
 import {
   Bell,
   Home,
-  Receipt,
+  ReceiptText,
   ShoppingCart,
-  User,
+  CircleUserRound,
   Moon,
   Sun,
+  Utensils,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Sidebar from './Sidebar'
@@ -184,10 +185,10 @@ export default function StudentLayout() {
 
   const navItems = [
     { type: 'divider', label: 'Student' },
-    { to: '/student/menu', icon: '🍽', label: 'Browse Menu' },
-    { to: '/student/cart', icon: '🛒', label: 'My Cart', badge: count },
-    { to: '/student/orders', icon: '📦', label: 'My Orders' },
-    { to: '/student/profile', icon: '👤', label: 'Profile' },
+    { to: '/student/menu', icon: Utensils, label: 'Browse Menu' },
+    { to: '/student/cart', icon: ShoppingCart, label: 'My Cart', badge: count },
+    { to: '/student/orders', icon: ReceiptText, label: 'My Orders' },
+    { to: '/student/profile', icon: CircleUserRound, label: 'Profile' },
   ]
 
   const updateSwipeDebug = useCallback((nextDebug) => {
@@ -572,7 +573,7 @@ export default function StudentLayout() {
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-100 active:scale-95 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
                 aria-label="Open profile"
               >
-                <User size={18} />
+                <CircleUserRound size={18} />
               </NavLink>
             </div>
           </div>
@@ -651,7 +652,7 @@ export default function StudentLayout() {
             />
             <BottomNavItem
               to="/student/orders"
-              icon={Receipt}
+              icon={ReceiptText}
               label="Orders"
               onClick={(event) => {
                 event.preventDefault()
@@ -670,7 +671,7 @@ export default function StudentLayout() {
             />
             <BottomNavItem
               to="/student/profile"
-              icon={User}
+              icon={CircleUserRound}
               label="Profile"
               onClick={(event) => {
                 event.preventDefault()

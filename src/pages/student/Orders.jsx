@@ -8,7 +8,21 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
-import { RefreshCw, ChevronDown, ChevronUp, Clock3 } from 'lucide-react'
+import {
+  BadgeCheck,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CircleCheck,
+  CircleX,
+  Clock3,
+  CookingPot,
+  FileText,
+  Package,
+  RotateCcw,
+  Star,
+  RefreshCw,
+} from 'lucide-react'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useCanteen } from '@/context/CanteenContext'
@@ -59,11 +73,24 @@ function getStatusBadgeClass(status) {
   }
 }
 
+function StatusIcon({ status, className = 'h-3.5 w-3.5' }) {
+  const icons = {
+    [ORDER_STATUS.PENDING]: Clock3,
+    [ORDER_STATUS.PREPARING]: CookingPot,
+    [ORDER_STATUS.READY]: BadgeCheck,
+    [ORDER_STATUS.COMPLETED]: CircleCheck,
+    [ORDER_STATUS.CANCELLED]: CircleX,
+  }
+  const Icon = icons[status] || CheckCircle2
+
+  return <Icon className={className} aria-hidden="true" />
+}
+
 function OrderProgress({ status }) {
   if (status === ORDER_STATUS.CANCELLED) {
     return (
       <div className="flex items-center gap-2 text-xs font-medium text-red-500">
-        <span>❌</span>
+        <CircleX className="h-4 w-4" aria-hidden="true" />
         <span>Order was cancelled</span>
       </div>
     )
@@ -90,7 +117,7 @@ function OrderProgress({ status }) {
                       : 'border-slate-200 text-slate-400 dark:border-gray-700',
                 ].join(' ')}
               >
-                {done && !current ? '✓' : i + 1}
+                {done && !current ? <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> : i + 1}
               </div>
 
               <span
@@ -344,7 +371,8 @@ export default function StudentOrders() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+        <h2 className="inline-flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
+          <Package className="h-5 w-5 text-emerald-500" aria-hidden="true" />
           My Orders 📦
         </h2>
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -358,7 +386,8 @@ export default function StudentOrders() {
     <div className="w-full max-w-full overflow-x-hidden animate-fade-in space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          <h2 className="inline-flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
+            <Package className="h-5 w-5 text-emerald-500" aria-hidden="true" />
             My Orders 📦
           </h2>
 
@@ -397,7 +426,7 @@ export default function StudentOrders() {
           <motion.div
             initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="mb-4 text-5xl"
+            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-gray-900 dark:text-slate-600"
           >
             📦
           </motion.div>
@@ -461,11 +490,11 @@ export default function StudentOrders() {
 
                     <span
                       className={[
-                        'rounded-full px-2.5 py-1 text-xs font-semibold',
+                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
                         getStatusBadgeClass(order.status),
                       ].join(' ')}
                     >
-                      {ORDER_STATUS_ICONS[order.status]}{' '}
+                      <StatusIcon status={order.status} />
                       {order.statusLabel ||
                         ORDER_STATUS_LABELS[order.status] ||
                         order.status}
@@ -541,8 +570,9 @@ export default function StudentOrders() {
                               <button
                                 type="button"
                                 onClick={() => setRatingModal({ open: true, item })}
-                                className="text-xs px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:hover:bg-emerald-500/25 transition-colors"
+                                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:hover:bg-emerald-500/25"
                               >
+                                <Star className="h-3.5 w-3.5" aria-hidden="true" />
                                 Rate
                               </button>
                             )}
@@ -563,8 +593,9 @@ export default function StudentOrders() {
                         type="button"
                         disabled={reorderingId === order.id || !isOrderingAllowed}
                         onClick={() => handleReorder(order)}
-                        className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-800 dark:text-slate-200 dark:hover:bg-gray-700"
+                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-800 dark:text-slate-200 dark:hover:bg-gray-700"
                       >
+                        <RotateCcw className={`h-4 w-4 ${reorderingId === order.id ? 'animate-spin' : ''}`} aria-hidden="true" />
                         {reorderingId === order.id
                           ? 'Reordering...'
                           : canteenLoading
@@ -580,8 +611,9 @@ export default function StudentOrders() {
                         type="button"
                         disabled={invoicePreview.loading}
                         onClick={() => handleInvoice(order)}
-                        className="rounded-2xl px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-emerald-500/10"
+                        className="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-emerald-500/10"
                       >
+                        <FileText className="h-4 w-4" aria-hidden="true" />
                         {invoicePreview.loading &&
                         invoicePreview.orderId === order.id
                           ? 'Loading Invoice...'

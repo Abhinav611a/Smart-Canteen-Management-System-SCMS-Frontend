@@ -8,6 +8,13 @@ import {
   Minus,
   ArrowRight,
   Star,
+  Clock,
+  PackageCheck,
+  Flame,
+  SearchX,
+  ShoppingCart,
+  ShoppingBag,
+  Utensils,
 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useCanteen } from '@/context/CanteenContext'
@@ -24,12 +31,14 @@ function getPrepBadge(item) {
   if (item.itemType === 'READY_MADE') {
     return {
       label: 'Instant',
+      icon: PackageCheck,
       className: 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
     }
   }
 
   return {
     label: `Takes ${item.prepTimeMinutes ?? 10} min`,
+    icon: Clock,
     className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
   }
 }
@@ -170,7 +179,10 @@ export default function StudentMenu() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white lg:text-2xl">
-              Today&apos;s Menu 🍽️
+              <span className="inline-flex items-center gap-2">
+                <Utensils className="h-5 w-5 text-emerald-500" aria-hidden="true" />
+                Today&apos;s Menu
+              </span>
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {loading ? 'Loading menu…' : `${availableCount} items available`}
@@ -249,7 +261,7 @@ export default function StudentMenu() {
 
       {!loading && filtered.length === 0 && (
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <p className="mb-3 text-4xl">🔍</p>
+          <SearchX className="mx-auto mb-3 h-12 w-12 text-slate-300 dark:text-slate-600" aria-hidden="true" />
           <p className="text-sm text-slate-500 dark:text-slate-400">
             No items match your search.
           </p>
@@ -277,6 +289,7 @@ export default function StudentMenu() {
               const canInteract = item.available && isOrderingAllowed && !cartSyncing
               const showImage = hasUsableImage(item)
               const prepBadge = getPrepBadge(item)
+              const PrepIcon = prepBadge.icon
 
               return (
                 <motion.article
@@ -287,7 +300,7 @@ export default function StudentMenu() {
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ delay: i * 0.03 }}
                   className={[
-                    'w-full max-w-full overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200',
+                    'w-full max-w-full overflow-hidden rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all duration-200 sm:p-4',
                     item.available
                       ? 'hover:-translate-y-0.5 hover:shadow-md'
                       : 'opacity-70',
@@ -310,7 +323,8 @@ export default function StudentMenu() {
 
                     {item.ordersToday > 30 && item.available && (
                       <div className="absolute right-3 top-3 z-10">
-                        <span className="inline-flex items-center rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                          <Flame className="h-3 w-3" aria-hidden="true" />
                           Popular
                         </span>
                       </div>
@@ -340,12 +354,12 @@ export default function StudentMenu() {
 
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      <div className="min-w-0 flex-1">
+                        <p className="mb-1 truncate text-[11px] font-medium uppercase tracking-wide text-slate-400">
                           {MENU_CATEGORY_EMOJIS[item.category]}{' '}
                           {MENU_CATEGORY_LABELS[item.category] ?? item.category}
                         </p>
-                        <h3 className="line-clamp-1 text-base font-bold text-slate-900 dark:text-white">
+                        <h3 className="truncate text-base font-bold text-slate-900 dark:text-white">
                           {item.name}
                         </h3>
                       </div>
@@ -359,20 +373,29 @@ export default function StudentMenu() {
                       {item.description || 'Freshly prepared and ready to order.'}
                     </p>
 
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className={`inline-flex items-center rounded-full px-2 py-1 font-semibold ${prepBadge.className}`}>
-                        {prepBadge.label}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold ${prepBadge.className}`}>
+                        {PrepIcon && <PrepIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+                        <span className="min-w-0 truncate leading-tight">
+                          {prepBadge.label}
+                        </span>
                       </span>
                       {item.rating == null ? (
-                        <span className="font-medium text-slate-400">No ratings yet</span>
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-500 dark:bg-gray-800/80 dark:text-slate-400">
+                          <Star className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          <span className="truncate leading-tight">No ratings</span>
+                        </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 font-semibold text-amber-500">
-                          <Star size={12} fill="currentColor" />
-                          {item.rating}
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 font-semibold text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
+                          <Star className="h-3.5 w-3.5 shrink-0" fill="currentColor" aria-hidden="true" />
+                          <span className="truncate leading-tight">{item.rating}</span>
                         </span>
                       )}
-                      <span className="text-slate-400">
-                        {item.ordersToday ?? 0} ordered today
+                      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-500 dark:bg-gray-800/80 dark:text-slate-400">
+                        <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate leading-tight">
+                          {item.ordersToday ?? 0} ordered
+                        </span>
                       </span>
                     </div>
 
@@ -411,7 +434,7 @@ export default function StudentMenu() {
                         disabled={!canInteract}
                         className="flex w-full max-w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-gray-700 dark:disabled:text-slate-400"
                       >
-                        <Plus size={16} />
+                        <ShoppingCart className="h-4 w-4" aria-hidden="true" />
                         {canteenLoading
                           ? 'Checking Status...'
                           : isOrderingAllowed

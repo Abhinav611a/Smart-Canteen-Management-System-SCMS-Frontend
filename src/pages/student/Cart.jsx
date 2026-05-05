@@ -12,6 +12,19 @@ import {
   isCartMismatchError,
 } from '@/services/cartService'
 import {
+  ArrowRight,
+  Banknote,
+  CheckCircle2,
+  CreditCard,
+  Minus,
+  Plus,
+  RefreshCw,
+  Smartphone,
+  ShoppingBag,
+  ShoppingCart,
+  Trash2,
+} from 'lucide-react'
+import {
   createPaymentOrder,
   openRazorpayCheckout,
   verifyPayment,
@@ -19,9 +32,9 @@ import {
 import { formatCurrency } from '@/utils/helpers'
 
 const PAYMENT_METHODS = [
-  { value: 'CASH', label: 'Cash', icon: '💵' },
-  { value: 'CARD', label: 'Card', icon: '💳' },
-  { value: 'UPI', label: 'UPI', icon: '📱' },
+  { value: 'CASH', label: 'Cash', icon: Banknote },
+  { value: 'CARD', label: 'Card', icon: CreditCard },
+  { value: 'UPI', label: 'UPI', icon: Smartphone },
 ]
 
 const SERVER_SYNC_MESSAGE =
@@ -404,9 +417,9 @@ export default function StudentCart() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', damping: 12 }}
-            className="text-7xl"
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
           >
-            🎉
+            <CheckCircle2 className="h-10 w-10" aria-hidden="true" />
           </motion.div>
 
           <div>
@@ -467,14 +480,20 @@ export default function StudentCart() {
               className="flex-1 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 dark:bg-gray-800 dark:text-slate-200 dark:hover:bg-gray-700"
               onClick={() => navigate('/student/menu')}
             >
-              Browse Menu
+              <span className="inline-flex items-center justify-center gap-2">
+                Browse Menu
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </span>
             </button>
             <button
               type="button"
               className="flex-1 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
               onClick={() => navigate('/student/orders')}
             >
-              Track Order
+              <span className="inline-flex items-center justify-center gap-2">
+                Track Order
+                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+              </span>
             </button>
           </div>
         </div>
@@ -488,9 +507,9 @@ export default function StudentCart() {
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="mb-4 text-6xl"
+          className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-gray-900 dark:text-slate-600"
         >
-          🛒
+          <ShoppingCart className="h-12 w-12" aria-hidden="true" />
         </motion.div>
         <h3 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">
           Your cart is empty
@@ -514,7 +533,10 @@ export default function StudentCart() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            My Cart 🛒
+            <span className="inline-flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-emerald-500" aria-hidden="true" />
+              My Cart
+            </span>
           </h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             {count} item{count !== 1 ? 's' : ''}
@@ -529,7 +551,10 @@ export default function StudentCart() {
             title="Sync cart with server"
             type="button"
           >
-            {cartBusy ? '⟳ Syncing…' : '⟳ Sync'}
+            <span className="inline-flex items-center gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${cartBusy ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {cartBusy ? 'Syncing...' : 'Sync'}
+            </span>
           </button>
           <button
             onClick={() => clearCart()}
@@ -593,9 +618,10 @@ export default function StudentCart() {
                   onClick={() => handleDecreaseQty(item)}
                   type="button"
                   disabled={cartBusy}
+                  aria-label={`Decrease quantity of ${item.name}`}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800"
                 >
-                  −
+                <Minus className="h-4 w-4" aria-hidden="true" />
                 </button>
 
                 <span className="w-5 text-center text-sm font-semibold text-slate-900 dark:text-white">
@@ -606,9 +632,10 @@ export default function StudentCart() {
                   onClick={() => handleIncreaseQty(item)}
                   type="button"
                   disabled={cartBusy || !isOrderingAllowed}
+                  aria-label={`Increase quantity of ${item.name}`}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800"
                 >
-                  +
+                  <Plus className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
 
@@ -622,8 +649,9 @@ export default function StudentCart() {
                 disabled={cartBusy}
                 className="ml-1 shrink-0 text-sm text-slate-300 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-600"
                 title="Remove item"
+                aria-label={`Remove ${item.name}`}
               >
-                ✕
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
             </motion.div>
           ))}
@@ -664,6 +692,7 @@ export default function StudentCart() {
           <div className="grid grid-cols-3 gap-3">
             {PAYMENT_METHODS.map((method) => {
               const selected = paymentMethod === method.value
+              const PaymentIcon = method.icon
 
               return (
                 <button
@@ -677,7 +706,7 @@ export default function StudentCart() {
                       : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  <span className="text-lg">{method.icon}</span>
+                  <PaymentIcon className="h-5 w-5" aria-hidden="true" />
                   <span>{method.label}</span>
                 </button>
               )
@@ -708,8 +737,9 @@ export default function StudentCart() {
           type="button"
           onClick={handlePlaceOrder}
           disabled={checkoutBlocked || !isOrderingAllowed}
-          className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 font-semibold text-white transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
+          <ShoppingBag className="h-4 w-4" aria-hidden="true" />
           {canteenLoading
             ? 'Checking Status...'
             : !isOrderingAllowed
