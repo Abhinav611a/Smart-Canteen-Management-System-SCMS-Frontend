@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
+import { useTheme } from '@/context/ThemeContext'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useCanteenStatus } from '@/hooks/useCanteenStatus'
 import CanteenBanner from '@/components/ui/CanteenBanner'
@@ -512,7 +513,6 @@ function LogoutModal({ open, onClose, onConfirm, theme }) {
 }
 
 export default function KitchenLayout() {
-  const [theme, setTheme] = useState('dark')
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [filter, setFilter] = useState('ALL')
   const [orders, setOrders] = useState([])
@@ -527,8 +527,10 @@ export default function KitchenLayout() {
   const [submittedReady, setSubmittedReady] = useState(false)
 
   const prevConnectedRef = useRef(false)
+  const themeButtonRef = useRef(null)
 
   const { logout } = useAuth()
+  const { theme, toggleThemeWithTransition, isThemeTransitioning } = useTheme()
   const navigate = useNavigate()
   const canteen = useCanteenStatus(true)
   const operationalActionsBlocked =
@@ -908,8 +910,22 @@ export default function KitchenLayout() {
 
               <Tooltip text="Toggle Theme" theme={theme}>
                 <button
+                  ref={themeButtonRef}
                   type="button"
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  onClick={(event) => {
+                    if (import.meta.env.DEV) {
+                      console.log('[ThemeButton] clicked', {
+                        hasAnimateToggle:
+                          typeof toggleThemeWithTransition === 'function',
+                        hasButtonRef: Boolean(themeButtonRef.current),
+                      })
+                    }
+
+                    toggleThemeWithTransition(
+                      event.currentTarget || themeButtonRef.current,
+                    )
+                  }}
+                  disabled={isThemeTransitioning}
                   className={`flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95 ${
                     theme === 'dark'
                       ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:shadow-emerald-900/30'

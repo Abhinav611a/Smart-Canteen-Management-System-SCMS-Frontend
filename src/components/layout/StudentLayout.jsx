@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Link,
   NavLink,
   Outlet,
   useLocation,
@@ -8,6 +9,7 @@ import {
 } from 'react-router-dom'
 import {
   Bell,
+  ArrowRight,
   Home,
   ReceiptText,
   ShoppingCart,
@@ -24,6 +26,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useCanteenStatus } from '@/hooks/useCanteenStatus'
 import CanteenBanner from '@/components/ui/CanteenBanner'
+import { formatCurrency } from '@/utils/helpers'
 
 const DEBUG_STUDENT_SWIPE = false
 const SWIPE_THRESHOLD = 56
@@ -104,12 +107,26 @@ function BottomNavItem({ to, icon: Icon, label, badge, onClick }) {
 }
 
 function ThemeToggleButton() {
-  const { isDark, toggle } = useTheme()
+  const buttonRef = useRef(null)
+  const { isDark, toggleThemeWithTransition, isThemeTransitioning } = useTheme()
+
+  const handleThemeClick = (event) => {
+    if (import.meta.env.DEV) {
+      console.log('[ThemeButton] clicked', {
+        hasAnimateToggle: typeof toggleThemeWithTransition === 'function',
+        hasButtonRef: Boolean(buttonRef.current),
+      })
+    }
+
+    toggleThemeWithTransition(event.currentTarget || buttonRef.current)
+  }
 
   return (
     <button
+      ref={buttonRef}
       type="button"
-      onClick={toggle}
+      onClick={handleThemeClick}
+      disabled={isThemeTransitioning}
       className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-slate-50 active:scale-95 dark:border-gray-800 dark:bg-gray-900 dark:text-slate-300 dark:hover:bg-gray-800"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -127,6 +144,36 @@ function ThemeToggleButton() {
         </motion.span>
       </AnimatePresence>
     </button>
+  )
+}
+
+function FloatingCartBar() {
+  const location = useLocation()
+  const { count: cartCount, total: cartTotal } = useCart()
+
+  if (!location.pathname.startsWith('/student/menu')) return null
+  if (cartCount <= 0) return null
+
+  return (
+    <div className="fixed inset-x-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[60] mx-auto max-w-md lg:hidden">
+      <Link
+        to="/student/cart"
+        className="flex w-full items-center justify-between rounded-3xl bg-emerald-500 px-5 py-4 text-white shadow-xl shadow-emerald-500/30 transition active:scale-[0.99]"
+      >
+        <div>
+          <p className="text-sm font-medium text-emerald-50">View cart</p>
+          <p className="text-base font-bold">
+            {cartCount} item{cartCount > 1 ? 's' : ''} &middot;{' '}
+            {formatCurrency(cartTotal)}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 text-base font-bold">
+          Open
+          <ArrowRight className="h-5 w-5" aria-hidden="true" />
+        </div>
+      </Link>
+    </div>
   )
 }
 
@@ -639,7 +686,9 @@ export default function StudentLayout() {
           </div>
         )}
 
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+        <FloatingCartBar />
+
+        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
           <div className="mx-auto flex w-full max-w-md items-center justify-around px-2 py-2 pb-[env(safe-area-inset-bottom)]">
             <BottomNavItem
               to="/student/menu"

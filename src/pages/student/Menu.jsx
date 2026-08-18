@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   Search,
   Plus,
   Minus,
-  ArrowRight,
   Star,
   Clock,
   PackageCheck,
@@ -110,15 +108,6 @@ export default function StudentMenu() {
     [cartItems]
   )
 
-  const cartTotal = useMemo(
-    () =>
-      cartItems.reduce(
-        (sum, item) => sum + (item.price || 0) * (item.qty || 0),
-        0
-      ),
-    [cartItems]
-  )
-
   const availableCount = useMemo(
     () => menu.filter((item) => item.available).length,
     [menu]
@@ -174,7 +163,14 @@ export default function StudentMenu() {
   }
 
   return (
-    <div className="w-full max-w-full space-y-5 overflow-x-hidden pb-24 lg:space-y-6 lg:pb-6">
+    <div
+      className={[
+        'w-full max-w-full space-y-5 overflow-x-hidden lg:space-y-6 lg:pb-6',
+        cartItemCount > 0
+          ? 'pb-[calc(180px+env(safe-area-inset-bottom))]'
+          : 'pb-[calc(96px+env(safe-area-inset-bottom))]',
+      ].join(' ')}
+    >
       <section className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -450,27 +446,6 @@ export default function StudentMenu() {
         </motion.div>
       )}
 
-      {cartItemCount > 0 && (
-        <div className="fixed bottom-20 left-0 right-0 z-30 px-4 lg:hidden">
-          <Link
-            to="/student/cart"
-            className="mx-auto flex w-full max-w-md items-center justify-between rounded-3xl bg-emerald-500 px-4 py-3 text-white shadow-lg shadow-emerald-500/25"
-          >
-            <div>
-              <p className="text-xs font-medium text-emerald-50">View cart</p>
-              <p className="text-sm font-bold">
-                {cartItemCount} item{cartItemCount > 1 ? 's' : ''} ·{' '}
-                {formatCurrency(cartTotal)}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              Open
-              <ArrowRight size={16} />
-            </div>
-          </Link>
-        </div>
-      )}
     </div>
   )
 }

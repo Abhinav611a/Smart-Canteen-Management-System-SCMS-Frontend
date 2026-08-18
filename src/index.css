@@ -177,6 +177,41 @@
     @apply bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400
            font-semibold;
   }
+
+  .theme-transition-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--theme-ripple-from);
+    contain: layout paint style;
+    animation: theme-overlay-fade 720ms linear forwards;
+  }
+
+  .theme-transition-circle {
+    position: absolute;
+    left: var(--theme-ripple-x);
+    top: var(--theme-ripple-y);
+    width: var(--theme-ripple-diameter);
+    height: var(--theme-ripple-diameter);
+    border-radius: 9999px;
+    transform: translate3d(-50%, -50%, 0) scale(0.001);
+    transform-origin: center;
+    will-change: transform, opacity;
+  }
+
+  .theme-transition-circle-main {
+    background: var(--theme-ripple-to);
+    opacity: 1;
+    animation: theme-ripple-expand 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .theme-transition-circle-edge {
+    background: var(--theme-ripple-edge);
+    opacity: 0.72;
+    animation: theme-ripple-edge 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
 }
 
 @layer utilities {
@@ -195,5 +230,35 @@
       radial-gradient(at 40% 20%, #052e16 0px, transparent 50%),
       radial-gradient(at 80% 0%,  #0f172a 0px, transparent 50%),
       radial-gradient(at 0%  50%, #030712 0px, transparent 50%);
+  }
+}
+
+@keyframes theme-ripple-expand {
+  from {
+    transform: translate3d(-50%, -50%, 0) scale(0.001);
+  }
+  to {
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+}
+
+@keyframes theme-ripple-edge {
+  from {
+    opacity: 0.72;
+    transform: translate3d(-50%, -50%, 0) scale(0.001);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(1.035);
+  }
+}
+
+@keyframes theme-overlay-fade {
+  0%,
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
