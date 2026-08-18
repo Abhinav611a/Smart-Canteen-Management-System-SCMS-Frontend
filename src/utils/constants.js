@@ -19,6 +19,7 @@ export const ENDPOINTS = {
   ADMIN_USER_ROLE: (id) => `/admin/users/${id}/role`,
   ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_APPROVE_PAYMENT: (id) => `/admin/orders/${id}/approve-payment`,
+  ADMIN_REJECT_ORDER: (id) => `/admin/orders/${id}/reject`,
   ADMIN_POS_ORDERS: '/admin/pos/orders',
 
   CANTEEN: '/canteen',

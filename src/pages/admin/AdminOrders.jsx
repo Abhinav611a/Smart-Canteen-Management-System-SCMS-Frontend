@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
+import { ordersService } from '@/services/orders'
 import { useOrders } from '@/hooks/useOrders'
 import { usePagination } from '@/hooks/usePagination'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -172,9 +173,25 @@ export default function AdminOrders() {
   }
 
   const handleReject = async (order) => {
-    toast.error(
-      `Reject API is not configured for ${order.orderNumber || `#${order.id}`}`
-    )
+    try {
+      setActionLoading(`reject-${order.id}`)
+      await ordersService.rejectAdminOrder(order.id)
+
+      toast.success(
+        `Order rejected for ${order.orderNumber || `#${order.id}`}`
+      )
+
+      await refetch()
+    } catch (e) {
+      console.error('Reject failed:', e)
+      toast.error(
+        e?.response?.data?.message ||
+          e?.message ||
+          'Failed to reject order'
+      )
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   if (loading) {

@@ -239,6 +239,10 @@ export const ordersService = {
     return api.patch(ENDPOINTS.ORDER_CANCEL(id))
   },
 
+  async rejectAdminOrder(id) {
+    return api.patch(ENDPOINTS.ADMIN_REJECT_ORDER(id))
+  },
+
   async delete(id) {
     return api.patch(ENDPOINTS.ORDER_CANCEL(id))
   },

@@ -1,5 +1,5 @@
 import { Client } from '@stomp/stompjs'
-import { BACKEND_URL, ENDPOINTS } from '@/utils/constants'
+import { BACKEND_URL, ENDPOINTS, LS_KEYS } from '@/utils/constants'
 import { normaliseOrder } from './orders'
 import { normaliseCanteenState } from './canteenService'
 
@@ -215,6 +215,14 @@ async function buildClient(token) {
     reconnectDelay: 5000,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
+
+    beforeConnect: (currentClient) => {
+      const currentToken = sessionStorage.getItem(LS_KEYS.JWT)
+
+      currentClient.connectHeaders = currentToken
+        ? { Authorization: `Bearer ${currentToken}` }
+        : {}
+    },
 
     onConnect: () => {
       console.log('[WS] STOMP CONNECTED', {
