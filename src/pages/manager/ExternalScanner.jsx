@@ -461,10 +461,10 @@ export default function ExternalScanner() {
 
         setPhase('scanning')
         setBannerTone('success')
-        setBannerTitle('Order verified')
-        setBannerMessage('Verification complete. Ready for the next scan.')
+        setBannerTitle('Order delivered successfully')
+        setBannerMessage('Delivery confirmed. Ready for the next scan.')
         setLastResultLabel(getOrderLabel(result))
-        toast.success(`${getOrderLabel(result)} verified.`, {
+        toast.success('Order delivered successfully', {
           id: 'external-scanner-success',
         })
       } catch (error) {

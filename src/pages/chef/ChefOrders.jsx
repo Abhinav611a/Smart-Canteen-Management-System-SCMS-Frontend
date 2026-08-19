@@ -8,6 +8,7 @@
 import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { CheckCircle2, RefreshCw, Scan } from 'lucide-react'
 import { useOrders } from '@/hooks/useOrders'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useNotifications } from '@/context/NotificationContext'
@@ -144,6 +145,9 @@ export default function ChefOrders() {
   const handleVerifyQr = useCallback(async (code) => {
     const result = await ordersService.verifyOrderQr(code)
     await refetch()
+    toast.success('Order delivered successfully', {
+      id: 'qr-delivery-success',
+    })
     return result
   }, [refetch])
 
@@ -289,7 +293,7 @@ export default function ChefOrders() {
             variant="secondary"
             size="sm"
             onClick={() => setScannerOpen(true)}
-            icon="Scan"
+            icon={<Scan className="h-4 w-4" aria-hidden="true" />}
           >
             Scan QR
           </Button>
@@ -324,7 +328,7 @@ export default function ChefOrders() {
             variant="ghost"
             size="sm"
             onClick={refetch}
-            icon="Refresh"
+            icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
             disabled={loading}
           >
             Refresh
@@ -446,7 +450,7 @@ export default function ChefOrders() {
                     onClick={() => handleComplete(order)}
                     loading={completingId === order.id}
                     disabled={operationalActionsBlocked}
-                    icon="Complete"
+                    icon={<CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
                   >
                     {canteen.loading
                       ? 'Checking Status...'

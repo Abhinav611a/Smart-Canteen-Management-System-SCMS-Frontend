@@ -657,7 +657,7 @@ export default function QRScannerModal({ open, onClose, onVerify }) {
         }
 
         setOrderLabel(getOrderLabel(result))
-        setMessage('Successfully collected')
+        setMessage('Order delivered successfully')
         setPhase('success')
         scheduleAutoClose()
       } catch (error) {
