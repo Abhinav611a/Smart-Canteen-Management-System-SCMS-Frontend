@@ -88,6 +88,13 @@ function normaliseOrderItem(item) {
   }
 }
 
+export function getOrderTotalItems(items = []) {
+  return items.reduce((sum, item) => {
+    const quantity = Number(item?.quantity ?? item?.qty ?? 1)
+    return sum + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1)
+  }, 0)
+}
+
 export function normaliseOrder(raw) {
   if (!raw) return null
 
@@ -111,9 +118,7 @@ export function normaliseOrder(raw) {
     orderNumber: raw.orderNumber ?? `#${raw.id}`,
     statusLabel: raw.statusLabel ?? raw.status,
     formattedDate: raw.formattedDate ?? null,
-    totalItems:
-      raw.totalItems ??
-      items.reduce((sum, item) => sum + (item.quantity || 0), 0),
+    totalItems: getOrderTotalItems(items),
     shortDescription: raw.shortDescription ?? '',
     canReorder: raw.canReorder ?? true,
     canDownloadInvoice: canAccessInvoice(raw),

@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { ordersService } from '@/services/orders'
+import { getOrderTotalItems, ordersService } from '@/services/orders'
 import { kitchenService } from '@/services/kitchenService'
 import { managerService } from '@/services/managerService'
 import { ORDER_STATUS } from '@/utils/constants'
@@ -35,13 +35,7 @@ function normalizeRealtimeOrder(order = {}) {
         ? order.totalAmount
         : Number(order.total ?? 0),
     items,
-    totalItems:
-      typeof order.totalItems === 'number'
-        ? order.totalItems
-        : items.reduce((sum, item) => {
-            const qty = Number(item?.quantity ?? item?.qty ?? 1)
-            return sum + qty
-          }, 0),
+    totalItems: getOrderTotalItems(items),
     orderNumber: order.orderNumber || `#${order.id}`,
     statusLabel: order.statusLabel || status || 'UNKNOWN',
   }

@@ -559,7 +559,9 @@ export default function StudentOrders() {
                             <span>
                               {MENU_CATEGORY_EMOJIS[item.category] || '🍴'}
                             </span>
-                            <span className="truncate">{item.name}</span>
+                            <span className="truncate">
+                              {item.quantity} × {item.name}
+                            </span>
                           </span>
 
                           <div className="flex items-center gap-2 shrink-0">
