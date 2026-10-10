@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { getLoginErrorMessage } from '@/utils/getApiErrorMessage'
 import { authService } from '@/services/auth'
 import { managerScannerService } from '@/services/managerScannerService'
 import {
@@ -330,10 +331,7 @@ export function AuthProvider({ children }) {
         websocketService.disconnect()
         wsTriedRef.current = false
         stopSilentRefresh()
-        const message = extractAuthErrorMessage(
-          error,
-          'Unable to sign in. Please check your credentials and try again.'
-        )
+        const message = getLoginErrorMessage(error)
 
         dispatch({
           type: 'SET_ERROR',

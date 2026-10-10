@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { getRoleHome } from '@/utils/helpers'
 import Input from '@/components/ui/Input'
@@ -47,14 +46,8 @@ export default function Login() {
     try {
       const user = await login(form)
       navigate(getRoleHome(user.role), { replace: true })
-    } catch (error) {
-      const message =
-        error?.response?.data?.error ||
-        error?.response?.data?.message ||
-        error?.message ||
-        'Unable to sign in. Please check your credentials and try again.'
-
-      toast.error(message, { id: 'login-error' })
+    } catch {
+      // AuthContext stores the failure message shown above the form.
     } finally {
       setLoading(false)
     }
@@ -94,8 +87,21 @@ export default function Login() {
           </h2>
 
           {authError && (
-            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
-              {authError}
+            <div
+              role="alert"
+              aria-live="polite"
+              className="mb-4 break-words rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+            >
+              <p>{authError}</p>
+              {authError.toLowerCase().includes('verify this email') && (
+                <Link
+                  to="/register"
+                  onClick={clearError}
+                  className="mt-2 inline-block font-semibold underline underline-offset-2"
+                >
+                  Continue to email verification
+                </Link>
+              )}
             </div>
           )}
 

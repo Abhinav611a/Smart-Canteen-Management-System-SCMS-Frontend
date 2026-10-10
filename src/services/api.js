@@ -222,6 +222,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status
     const body = error.response?.data
     const url = error.config?.url || ''
+    const isLoginRequest = url.includes('/users/login')
     const originalRequest = error.config || {}
     const requestContext = getRequestLogContext(originalRequest)
 
@@ -300,26 +301,30 @@ apiClient.interceptors.response.use(
         break
 
       case typeof status === 'number' && status >= 500:
-        console.error('[API] 5xx response request context', requestContext)
-        console.error('[API] 5xx request payload\n' + stringifyApiLogValue(originalRequest.data))
-        console.error('[API] 5xx response status', status)
-        console.error('[API] 5xx response body', body)
-        console.error('[API] 5xx response body JSON\n' + stringifyApiLogValue(body))
-        console.error(
-          '[API] 5xx response headers JSON\n' +
-            stringifyApiLogValue(error.response?.headers),
-        )
-        toast.error('Server error. Please try again later.')
+        if (!isLoginRequest) {
+          console.error('[API] 5xx response request context', requestContext)
+          console.error('[API] 5xx request payload\n' + stringifyApiLogValue(originalRequest.data))
+          console.error('[API] 5xx response status', status)
+          console.error('[API] 5xx response body', body)
+          console.error('[API] 5xx response body JSON\n' + stringifyApiLogValue(body))
+          console.error(
+            '[API] 5xx response headers JSON\n' +
+              stringifyApiLogValue(error.response?.headers),
+          )
+          toast.error('Server error. Please try again later.')
+        }
         break
 
       case !error.response: {
-        const now = Date.now()
-        if (now - networkErrLastShown > NETWORK_ERR_DEBOUNCE_MS) {
-          networkErrLastShown = now
-          toast.error(
-            'Network error. Check your connection or try again shortly.',
-            { id: 'network-error' },
-          )
+        if (!isLoginRequest) {
+          const now = Date.now()
+          if (now - networkErrLastShown > NETWORK_ERR_DEBOUNCE_MS) {
+            networkErrLastShown = now
+            toast.error(
+              'Network error. Check your connection or try again shortly.',
+              { id: 'network-error' },
+            )
+          }
         }
         break
       }
