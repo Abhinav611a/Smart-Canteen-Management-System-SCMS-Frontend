@@ -1,4 +1,4 @@
-# 🍽️ Smart Canteen Management System (SCMS)
+# 🍽️ My Canteen — Smart Canteen Management System (SCMS)
 
 <p align="center">
   <b>A full-stack, real-time canteen automation system built with modern web technologies.</b>

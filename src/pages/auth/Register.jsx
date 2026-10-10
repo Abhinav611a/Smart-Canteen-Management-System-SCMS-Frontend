@@ -408,7 +408,7 @@ export default function Register() {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
             {showRegisterStep
-              ? 'Join CanteenDAO'
+              ? 'Join My Canteen'
               : 'Enter the verification code from your inbox'}
           </p>
         </div>

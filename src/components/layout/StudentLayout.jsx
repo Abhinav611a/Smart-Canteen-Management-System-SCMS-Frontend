@@ -65,7 +65,7 @@ function getPageTitle(pathname) {
   if (pathname.includes('/student/cart')) return 'My Cart'
   if (pathname.includes('/student/profile')) return 'Profile'
   if (pathname.includes('/student/invoices')) return 'Invoices'
-  return 'Canteen Pro'
+  return 'My Canteen'
 }
 
 function BottomNavItem({ to, icon: Icon, label, badge, onClick }) {

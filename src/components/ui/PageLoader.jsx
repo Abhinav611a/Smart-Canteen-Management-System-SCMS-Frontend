@@ -9,7 +9,7 @@ export default function PageLoader() {
             <span className="text-xl">🍽</span>
           </div>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium animate-pulse">Loading CanteenDAO…</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium animate-pulse">Loading My Canteen…</p>
       </div>
     </div>
   )

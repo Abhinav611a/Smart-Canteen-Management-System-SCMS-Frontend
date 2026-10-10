@@ -29,7 +29,7 @@ function reducer(state, action) {
 const INITIAL_NOTIFICATIONS = [
   { id: 1, type: 'order',   title: 'New Order Received',    message: 'ORD-003 is waiting for your confirmation', read: false, time: new Date(Date.now() - 60000).toISOString(),   icon: '🎫' },
   { id: 3, type: 'status',  title: 'Order Ready',           message: 'Your order ORD-002 is ready for pickup!',  read: true,  time: new Date(Date.now() - 900000).toISOString(),  icon: '✅' },
-  { id: 4, type: 'system',  title: 'Welcome to CanteenDAO', message: 'Your account is set up and ready to use.', read: true,  time: new Date(Date.now() - 3600000).toISOString(), icon: '🍽' },
+  { id: 4, type: 'system',  title: 'Welcome to My Canteen', message: 'Your account is set up and ready to use.', read: true,  time: new Date(Date.now() - 3600000).toISOString(), icon: '🍽' },
 ]
 
 export function NotificationProvider({ children }) {

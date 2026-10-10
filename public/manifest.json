@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "CanteenDAO",
-  "short_name": "CanteenDAO",
+  "name": "My Canteen",
+  "short_name": "My Canteen",
   "description": "Smart Canteen Management",
   "start_url": "/",
   "scope": "/",

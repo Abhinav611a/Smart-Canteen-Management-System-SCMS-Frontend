@@ -50,11 +50,11 @@ export default function Sidebar({ navItems, open, onClose }) {
           <div className="flex items-center gap-3">
             <img
               src="/brand-icon.svg"
-              alt="CanteenDAO"
+              alt="My Canteen"
               className="h-9 w-9 shrink-0 rounded-xl shadow-sm"
             />
             <span className="text-base font-bold leading-none tracking-tight text-gray-900 dark:text-white">
-              CanteenDAO
+              My Canteen
             </span>
           </div>
           <button onClick={onClose} className="lg:hidden btn-ghost p-1.5" aria-label="Close sidebar">
